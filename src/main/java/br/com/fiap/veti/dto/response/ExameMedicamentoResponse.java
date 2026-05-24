@@ -1,8 +1,8 @@
 package br.com.fiap.veti.dto.response;
 
-public record ExameMedicamentoResponse(long id,
+public record ExameMedicamentoResponse(Long id,
                                        int quantidadeMedicamento,
                                        String posologia,
-                                       long idExame,
-                                       long idMedicamento) {
+                                       Long idExame,
+                                       Long idMedicamento) {
 }

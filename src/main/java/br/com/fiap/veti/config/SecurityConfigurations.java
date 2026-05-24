@@ -34,8 +34,15 @@ public class SecurityConfigurations {
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/swagger-ui.html"
-                        ).permitAll())
+                                "/swagger-ui.html",
+                                "/h2-console/**"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.GET).permitAll()
+                        .requestMatchers(HttpMethod.POST).authenticated()
+                        .requestMatchers(HttpMethod.DELETE).authenticated()
+                        .requestMatchers(HttpMethod.PUT).authenticated()
+                        .anyRequest().authenticated()
+                )
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

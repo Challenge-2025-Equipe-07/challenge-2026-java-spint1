@@ -5,6 +5,6 @@ import jakarta.validation.constraints.NotNull;
 
 public record ExameMedicamentoRequest(@NotNull int quantidadeMedicamento,
                                       @NotBlank String posologia,
-                                      @NotNull long idExame,
-                                      @NotNull long idMedicamento) {
+                                      @NotNull Long idExame,
+                                      @NotNull Long idMedicamento) {
 }

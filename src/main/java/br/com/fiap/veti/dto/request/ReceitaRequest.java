@@ -5,5 +5,5 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-public record ReceitaRequest(@NotBlank String descricao, @NotNull long idConsulta,@NotNull List<ReceitaMedicamentoRequest> receitaPedidoMedicamento) {
+public record ReceitaRequest(@NotBlank String descricao, @NotNull Long idConsulta,@NotNull List<ReceitaMedicamentoRequest> receitaPedidoMedicamento) {
 }

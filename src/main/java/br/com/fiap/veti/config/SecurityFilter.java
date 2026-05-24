@@ -28,24 +28,36 @@ public class SecurityFilter extends OncePerRequestFilter {
     private VeterinarioRepository veterinarioRepository;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        var token = this.recoverToken(request);
-        if(Objects.nonNull(token)){
-            var login = tokenService.validateToken(token);
-            UserDetails vet = veterinarioRepository.findByEmail(login);
-            var authentication = new UsernamePasswordAuthenticationToken(vet,null, vet.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-        }
-        filterChain.doFilter(request,response);
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
 
+        var token = this.recoverToken(request);
+
+        if (token != null) {
+            var login = tokenService.validateToken(token);
+
+            if (login != null && !login.isEmpty()) {
+                UserDetails vet = veterinarioRepository.findByEmail(login);
+
+                if (vet != null) {
+                    var authentication = new UsernamePasswordAuthenticationToken(
+                            vet, null, vet.getAuthorities()
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            }
+        }
+
+        filterChain.doFilter(request, response);
     }
 
     private String recoverToken(HttpServletRequest request) {
         var authHeader = request.getHeader("Authorization");
-        if(authHeader == null || authHeader.isBlank()){
+        if (authHeader == null || authHeader.isBlank()) {
             return null;
         }
-
-        return authHeader.replace("Bearer", "");
+        return authHeader.replace("Bearer ", "");
     }
 }
