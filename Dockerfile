@@ -1,13 +1,11 @@
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /app
-COPY gradle/ gradle/
-COPY gradlew settings.gradle build.gradle ./
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon
+COPY pom.xml ./
+RUN mvn dependency:go-offline -B
 COPY src/ src/
-RUN ./gradlew bootJar --no-daemon
-
+RUN mvn package -DskipTests -B
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
+COPY --from=build /app/target/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
