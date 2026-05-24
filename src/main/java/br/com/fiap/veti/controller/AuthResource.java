@@ -2,9 +2,12 @@ package br.com.fiap.veti.controller;
 
 import br.com.fiap.veti.dto.request.LoginRequest;
 import br.com.fiap.veti.dto.request.RegisterRequest;
+import br.com.fiap.veti.dto.response.LoginResponse;
+import br.com.fiap.veti.dto.response.VeterinarioResponse;
 import br.com.fiap.veti.entity.VeterinarioEntity;
 import br.com.fiap.veti.mapper.VeterinarioMapper;
 import br.com.fiap.veti.repository.VeterinarioRepository;
+import br.com.fiap.veti.service.TokenService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,12 +30,15 @@ public class AuthResource {
 
     @Autowired
     VeterinarioMapper veterinarioMapper;
+    @Autowired
+    private TokenService tokenService;
 
     @PostMapping("/login")
     public ResponseEntity login(@RequestBody @Valid LoginRequest loginRequest) {
         var usuarioSenha = new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password());
         var auth = this.authenticationManager.authenticate(usuarioSenha);
-        return ResponseEntity.ok().build();
+        var token = tokenService.generateToken((VeterinarioEntity) auth.getPrincipal());
+        return ResponseEntity.ok(token);
     }
 
     @PostMapping("/register")
