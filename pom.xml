@@ -79,6 +79,12 @@
             <version>2.2.224</version>
             <scope>runtime</scope>
         </dependency>
+        <!-- Azure SQL Server (PaaS) — used in production on Azure App Service -->
+        <dependency>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <!--Other-->
         <dependency>
             <groupId>org.projectlombok</groupId>
