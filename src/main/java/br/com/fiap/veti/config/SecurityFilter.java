@@ -4,22 +4,22 @@ import br.com.fiap.veti.repository.VeterinarioRepository;
 import br.com.fiap.veti.service.TokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.apachecommons.CommonsLog;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Objects;
 
 @Component
 public class SecurityFilter extends OncePerRequestFilter {
+
+    private static final String COOKIE_NAME = "veti_token";
 
     @Autowired
     private TokenService tokenService;
@@ -54,10 +54,31 @@ public class SecurityFilter extends OncePerRequestFilter {
     }
 
     private String recoverToken(HttpServletRequest request) {
+        String tokenFromHeader = recoverTokenFromHeader(request);
+        if (tokenFromHeader != null) {
+            return tokenFromHeader;
+        }
+        return recoverTokenFromCookie(request);
+    }
+
+    private String recoverTokenFromHeader(HttpServletRequest request) {
         var authHeader = request.getHeader("Authorization");
         if (authHeader == null || authHeader.isBlank()) {
             return null;
         }
         return authHeader.replace("Bearer ", "");
+    }
+
+    private String recoverTokenFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (COOKIE_NAME.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 }
