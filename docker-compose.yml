@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: ccgl
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: veti-db
+
     volumes:
       - veti-data:/var/lib/postgresql
 
@@ -17,6 +18,8 @@ services:
       - DB_USER=ccgl
       - DB_PASSWORD=secret
       - DB_URL=jdbc:postgresql://db:5432/veti-db
+      - GOOGLE_CLIENT_ID=484681037880-492aijp28gb4rndl2gi040cqj3gt0efi.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
     depends_on:
       - db
 

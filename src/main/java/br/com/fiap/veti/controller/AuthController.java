@@ -2,8 +2,6 @@ package br.com.fiap.veti.controller;
 
 import br.com.fiap.veti.dto.request.LoginRequest;
 import br.com.fiap.veti.dto.request.RegisterRequest;
-import br.com.fiap.veti.dto.response.LoginResponse;
-import br.com.fiap.veti.dto.response.VeterinarioResponse;
 import br.com.fiap.veti.entity.VeterinarioEntity;
 import br.com.fiap.veti.mapper.VeterinarioMapper;
 import br.com.fiap.veti.repository.VeterinarioRepository;
@@ -14,14 +12,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.ModelAndView;
 
 @RestController
 @RequestMapping("/auth")
-public class AuthResource {
+public class AuthController {
     @Autowired
     private AuthenticationManager authenticationManager;
 
@@ -32,6 +32,11 @@ public class AuthResource {
     VeterinarioMapper veterinarioMapper;
     @Autowired
     private TokenService tokenService;
+
+    @GetMapping("/login")
+    public ModelAndView loginPage() {
+        return new ModelAndView("login");
+    }
 
     @PostMapping("/login")
     public ResponseEntity login(@RequestBody @Valid LoginRequest loginRequest) {
@@ -50,7 +55,7 @@ public class AuthResource {
                 BCryptPasswordEncoder().encode(registerDTO.password());
         RegisterRequest novoUsuario = new RegisterRequest(registerDTO.email(), encryptedPassword,
                 registerDTO.role());
-                   veterinarioRepository.save(veterinarioMapper.toEntity(novoUsuario));
+        veterinarioRepository.save(veterinarioMapper.toEntity(novoUsuario));
         return ResponseEntity.ok().build();
 
     }

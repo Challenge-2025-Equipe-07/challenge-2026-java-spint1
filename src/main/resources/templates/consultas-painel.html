@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Veti - Consultas</title>
+</head>
+<body>
+<h1>Consultas agendadas</h1>
+
+<p th:if="${sucesso}" th:text="${sucesso}" style="color: green;"></p>
+<p th:if="${erro}" th:text="${erro}" style="color: red;"></p>
+
+<table border="1" cellpadding="8">
+  <thead>
+  <tr>
+    <th>Data</th>
+    <th>Pet</th>
+    <th>Tutor</th>
+    <th>Veterinário</th>
+    <th>Ação</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="consulta : ${consultas}">
+    <td th:text="${#temporals.format(consulta.dataConsulta, 'dd/MM/yyyy HH:mm')}"></td>
+    <td th:text="${consulta.pet.nome}"></td>
+    <td th:text="${consulta.pet.tutor.nome}"></td>
+    <td th:text="${consulta.veterinario.email}"></td>
+    <td>
+      <form th:action="@{/consultas/painel/{id}/notificar(id=${consulta.id})}" method="post">
+        <button type="submit">Notificar tutor</button>
+      </form>
+    </td>
+  </tr>
+  </tbody>
+</table>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Veti - Login</title>
+</head>
+<body>
+<div class="login-container">
+    <h1>Bem-vindo à Veti</h1>
+
+    <form th:action="@{/auth/login}" method="post">
+        <input type="email" name="email" placeholder="E-mail" required>
+        <input type="password" name="password" placeholder="Senha" required>
+        <button type="submit">Entrar</button>
+    </form>
+
+    <div class="divider">ou</div>
+
+    <a th:href="@{/oauth2/authorization/google}">Entrar com Google</a>
+</div>
+</body>
+</html>

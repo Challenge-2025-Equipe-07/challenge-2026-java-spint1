@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Veti - Tutores</title>
+</head>
+<body>
+<h1>Tutores cadastrados</h1>
+<table border="1" cellpadding="8">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>Nome</th>
+    <th>CPF</th>
+    <th>E-mail</th>
+    <th>Telefone</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="tutor : ${tutores}">
+    <td th:text="${tutor.id}"></td>
+    <td th:text="${tutor.name}"></td>
+    <td th:text="${tutor.cpf}"></td>
+    <td th:text="${tutor.email}"></td>
+    <td th:text="${tutor.phone}"></td>
+  </tr>
+  </tbody>
+</table>
+</body>
+</html>

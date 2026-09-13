@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Veti - Pets</title>
+</head>
+<body>
+<h1>Pets cadastrados</h1>
+<table border="1" cellpadding="8">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Nome</th>
+        <th>Raça</th>
+        <th>Peso</th>
+        <th>Idade</th>
+        <th>Castrado</th>
+        <th>ID do Tutor</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="pet : ${pets}">
+        <td th:text="${pet.id}"></td>
+        <td th:text="${pet.nome}"></td>
+        <td th:text="${pet.raca}"></td>
+        <td th:text="${pet.peso}"></td>
+        <td th:text="${pet.idade}"></td>
+        <td th:text="${pet.castrado} ? 'Sim' : 'Não'"></td>
+        <td th:text="${pet.idTutor}"></td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>

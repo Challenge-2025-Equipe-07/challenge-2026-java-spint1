@@ -37,6 +37,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         cookie.setPath("/");
         response.addCookie(cookie);
 
-        response.sendRedirect("/dashboard");
+        response.sendRedirect("/veti/consultas");
     }
 }

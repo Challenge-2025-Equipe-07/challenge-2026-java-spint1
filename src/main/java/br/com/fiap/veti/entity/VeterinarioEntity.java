@@ -48,7 +48,7 @@ public class VeterinarioEntity implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        if (Role.ADMIN.equals(this.role)) {
+        if (Role.ADMIN.name().equals(this.role)) {
             return List.of(new SimpleGrantedAuthority("ADMIN"), new SimpleGrantedAuthority("USER"));
         } else {
             return List.of(new SimpleGrantedAuthority("USER"));

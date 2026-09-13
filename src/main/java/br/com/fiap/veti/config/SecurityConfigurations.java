@@ -1,7 +1,7 @@
 package br.com.fiap.veti.config;
 
 import br.com.fiap.veti.handler.OAuth2SuccessHandler;
-import br.com.fiap.veti.service.OAuth2UserService;
+import br.com.fiap.veti.service.CustomOAuth2UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,7 +24,7 @@ public class SecurityConfigurations {
     SecurityFilter securityFilter;
 
     @Autowired
-    OAuth2UserService customOAuth2UserService;
+    CustomOAuth2UserService customOAuth2UserService;
 
     @Autowired
     OAuth2SuccessHandler oAuth2SuccessHandler;
@@ -38,24 +38,26 @@ public class SecurityConfigurations {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.GET, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .requestMatchers(
-                                "/login",
                                 "/oauth2/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/h2-console/**"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/pets/painel", "/tutores/painel", "/veterinarios/painel", "/consultas/painel").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/", "/dashboard").authenticated()
+                        .requestMatchers(HttpMethod.POST).hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE).hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.GET).permitAll()
-                        .requestMatchers(HttpMethod.POST).authenticated()
-                        .requestMatchers(HttpMethod.DELETE).authenticated()
                         .requestMatchers(HttpMethod.PUT).authenticated()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
-                        .loginPage("/login")
+                        .loginPage("/auth/login")
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)
                 )
