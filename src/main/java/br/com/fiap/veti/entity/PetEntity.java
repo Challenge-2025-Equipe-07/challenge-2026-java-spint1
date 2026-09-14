@@ -40,6 +40,9 @@ public class PetEntity {
     @Column(name = "DS_IDADE", nullable = false)
     private Integer idade;
 
+    @Column(name = "FL_CASTRADO", nullable = false)
+    private boolean castrado;
+
     @NotNull(message = "Tutor é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(

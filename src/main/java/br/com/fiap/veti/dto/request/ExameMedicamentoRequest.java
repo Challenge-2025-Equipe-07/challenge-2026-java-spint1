@@ -3,7 +3,7 @@ package br.com.fiap.veti.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public record ExameMedicamentoRequest(@NotNull int quantidadeMedicamento,
+public record ExameMedicamentoRequest(int quantidadeMedicamento,
                                       @NotBlank String posologia,
                                       @NotNull Long idExame,
                                       @NotNull Long idMedicamento) {
