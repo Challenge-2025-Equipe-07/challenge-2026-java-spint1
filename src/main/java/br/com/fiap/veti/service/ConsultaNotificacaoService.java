@@ -3,16 +3,20 @@ package br.com.fiap.veti.service;
 import br.com.fiap.veti.dto.response.NotificacaoConsultaResponse;
 import br.com.fiap.veti.entity.ConsultaEntity;
 import br.com.fiap.veti.repository.ConsultaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
 @Service
+@RequiredArgsConstructor
 public class ConsultaNotificacaoService {
 
-    @Autowired
-    private ConsultaRepository consultaRepository;
+    private static final Logger log = LoggerFactory.getLogger(ConsultaNotificacaoService.class);
+
+    private final ConsultaRepository consultaRepository;
 
     public NotificacaoConsultaResponse notificarTutor(Long consultaId) {
         ConsultaEntity consulta = consultaRepository.findByIdComPetETutor(consultaId)
@@ -28,7 +32,7 @@ public class ConsultaNotificacaoService {
                 consulta.getVeterinario().getEmail()
         );
 
-        System.out.println("[NOTIFICAÇÃO SIMULADA] Para: " + tutor.getEmail() + " | " + mensagem);
+        log.info("[NOTIFICAÇÃO SIMULADA] Para: {} | {}", tutor.getEmail(), mensagem);
 
         return new NotificacaoConsultaResponse(
                 tutor.getNome(),

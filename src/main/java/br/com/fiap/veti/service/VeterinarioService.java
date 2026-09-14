@@ -4,9 +4,8 @@ import br.com.fiap.veti.dto.response.VeterinarioResponse;
 import br.com.fiap.veti.entity.VeterinarioEntity;
 import br.com.fiap.veti.mapper.VeterinarioMapper;
 import br.com.fiap.veti.repository.VeterinarioRepository;
-import jakarta.persistence.EntityNotFoundException;
+import br.com.fiap.veti.service.support.EntityFinder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -18,11 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class VeterinarioService {
 
-    @Autowired
-    VeterinarioRepository veterinarioRepository;
-
-    @Autowired
-    VeterinarioMapper mapper;
+    private final VeterinarioRepository veterinarioRepository;
+    private final VeterinarioMapper mapper;
 
     @Cacheable("veterinarios")
     public Page<VeterinarioResponse> listarTodos(Pageable pageable) {
@@ -41,7 +37,6 @@ public class VeterinarioService {
     }
 
     public VeterinarioEntity buscarEntidade(Long id) {
-        return veterinarioRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Veterinário não encontrado: " + id));
+        return EntityFinder.findOrThrow(veterinarioRepository, id, "Veterinário");
     }
 }

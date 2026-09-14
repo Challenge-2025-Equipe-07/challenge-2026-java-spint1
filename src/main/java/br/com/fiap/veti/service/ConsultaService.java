@@ -9,9 +9,8 @@ import br.com.fiap.veti.mapper.ConsultaMapper;
 import br.com.fiap.veti.repository.ConsultaRepository;
 import br.com.fiap.veti.repository.PetRepository;
 import br.com.fiap.veti.repository.VeterinarioRepository;
-import jakarta.persistence.EntityNotFoundException;
+import br.com.fiap.veti.service.support.EntityFinder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -19,23 +18,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
-import static java.util.Arrays.stream;
-import static org.springframework.data.domain.Pageable.unpaged;
-
 @Service
 @RequiredArgsConstructor
 public class ConsultaService {
 
-    @Autowired
-    ConsultaRepository consultaRepository;
-    @Autowired
-    PetRepository petRepository;
-    @Autowired
-    VeterinarioRepository veterinarioRepository;
-    @Autowired
-    ConsultaMapper mapper;
+    private final ConsultaRepository consultaRepository;
+    private final PetRepository petRepository;
+    private final VeterinarioRepository veterinarioRepository;
+    private final ConsultaMapper mapper;
 
     @Cacheable("consultas")
     public Page<ConsultaResponse> listarTodos(Pageable pageable) {
@@ -50,10 +40,8 @@ public class ConsultaService {
     @Transactional
     @CacheEvict(value = {"consultas", "consulta"}, allEntries = true)
     public ConsultaResponse criar(ConsultaRequest request) {
-        PetEntity pet = petRepository.findById(request.idPet())
-                .orElseThrow(() -> new EntityNotFoundException("Pet não encontrado: " + request.idPet()));
-        VeterinarioEntity vet = veterinarioRepository.findById(request.idVeterinario())
-                .orElseThrow(() -> new EntityNotFoundException("Veterinário não encontrado: " + request.idVeterinario()));
+        PetEntity pet = EntityFinder.findOrThrow(petRepository, request.idPet(), "Pet");
+        VeterinarioEntity vet = EntityFinder.findOrThrow(veterinarioRepository, request.idVeterinario(), "Veterinário");
 
         boolean jaExiste = consultaRepository.findByVeterinarioId(request.idVeterinario(), Pageable.unpaged())
                 .stream()
@@ -74,10 +62,8 @@ public class ConsultaService {
     @CacheEvict(value = {"consultas", "consulta"}, allEntries = true)
     public ConsultaResponse atualizar(Long id, ConsultaRequest request) {
         ConsultaEntity consulta = buscarEntidade(id);
-        PetEntity pet = petRepository.findById(request.idPet())
-                .orElseThrow(() -> new EntityNotFoundException("Pet não encontrado: " + request.idPet()));
-        VeterinarioEntity vet = veterinarioRepository.findById(request.idVeterinario())
-                .orElseThrow(() -> new EntityNotFoundException("Veterinário não encontrado: " + request.idVeterinario()));
+        PetEntity pet = EntityFinder.findOrThrow(petRepository, request.idPet(), "Pet");
+        VeterinarioEntity vet = EntityFinder.findOrThrow(veterinarioRepository, request.idVeterinario(), "Veterinário");
         consulta.setDataConsulta(request.dataConsulta());
         consulta.setPet(pet);
         consulta.setVeterinario(vet);
@@ -91,7 +77,6 @@ public class ConsultaService {
     }
 
     private ConsultaEntity buscarEntidade(Long id) {
-        return consultaRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Consulta não encontrada: " + id));
+        return EntityFinder.findOrThrow(consultaRepository, id, "Consulta");
     }
 }

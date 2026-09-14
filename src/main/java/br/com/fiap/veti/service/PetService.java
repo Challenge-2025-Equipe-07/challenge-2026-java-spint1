@@ -7,9 +7,8 @@ import br.com.fiap.veti.entity.TutorEntity;
 import br.com.fiap.veti.mapper.PetMapper;
 import br.com.fiap.veti.repository.PetRepository;
 import br.com.fiap.veti.repository.TutorRepository;
-import jakarta.persistence.EntityNotFoundException;
+import br.com.fiap.veti.service.support.EntityFinder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -21,13 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PetService {
 
-    @Autowired
-    PetRepository petRepository;
-    @Autowired
-    TutorRepository tutorRepository;
-
-    @Autowired
-    PetMapper mapper;
+    private final PetRepository petRepository;
+    private final TutorRepository tutorRepository;
+    private final PetMapper mapper;
 
 
     @Cacheable("pets")
@@ -43,13 +38,13 @@ public class PetService {
     @Transactional
     @CacheEvict(value = {"pets", "pet"}, allEntries = true)
     public PetResponse criar(PetRequest request) {
-        TutorEntity tutor = tutorRepository.findById(request.idTutor())
-                .orElseThrow(() -> new EntityNotFoundException("TutorEntity não encontrado: " + request.idTutor()));
+        TutorEntity tutor = EntityFinder.findOrThrow(tutorRepository, request.idTutor(), "Tutor");
         PetEntity pet = PetEntity.builder()
                 .nome(request.name())
                 .raca(request.raca().name())
                 .peso(request.peso())
                 .idade(request.idade())
+                .castrado(request.castrado())
                 .tutor(tutor)
                 .build();
         return mapper.toResponse(petRepository.save(pet));
@@ -59,12 +54,12 @@ public class PetService {
     @CacheEvict(value = {"pets", "pet"}, allEntries = true)
     public PetResponse atualizar(Long id, PetRequest request) {
         PetEntity pet = buscarEntidade(id);
-        TutorEntity tutor = tutorRepository.findById(request.idTutor())
-                .orElseThrow(() -> new EntityNotFoundException("TutorEntity não encontrado: " + request.idTutor()));
+        TutorEntity tutor = EntityFinder.findOrThrow(tutorRepository, request.idTutor(), "Tutor");
         pet.setNome(request.name());
         pet.setRaca(request.raca().name());
         pet.setPeso(request.peso());
         pet.setIdade(request.idade());
+        pet.setCastrado(request.castrado());
         pet.setTutor(tutor);
         return mapper.toResponse(petRepository.save(pet));
     }
@@ -76,8 +71,7 @@ public class PetService {
     }
 
     private PetEntity buscarEntidade(Long id) {
-        return petRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("PetEntity não encontrado: " + id));
+        return EntityFinder.findOrThrow(petRepository, id, "Pet");
     }
 
 }

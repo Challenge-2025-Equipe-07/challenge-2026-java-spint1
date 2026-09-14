@@ -5,10 +5,8 @@ import br.com.fiap.veti.dto.response.TutorResponse;
 import br.com.fiap.veti.entity.TutorEntity;
 import br.com.fiap.veti.mapper.TutorMapper;
 import br.com.fiap.veti.repository.TutorRepository;
-import br.com.fiap.veti.repository.VeterinarioRepository;
-import jakarta.persistence.EntityNotFoundException;
+import br.com.fiap.veti.service.support.EntityFinder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -20,13 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TutorService {
 
-    @Autowired
-    TutorRepository tutorRepository;
-
-    @Autowired
-    TutorMapper mapper;
-    @Autowired
-    private VeterinarioRepository veterinarioRepository;
+    private final TutorRepository tutorRepository;
+    private final TutorMapper mapper;
 
     @Cacheable("tutores")
     public Page<TutorResponse> listarTodos(Pageable pageable) {
@@ -82,7 +75,6 @@ public class TutorService {
     }
 
     private TutorEntity buscarEntidade(Long id) {
-        return tutorRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("TutorEntity não encontrado: " + id));
+        return EntityFinder.findOrThrow(tutorRepository, id, "Tutor");
     }
 }
