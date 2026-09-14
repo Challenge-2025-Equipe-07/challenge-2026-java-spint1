@@ -2,7 +2,7 @@ package br.com.fiap.veti.config;
 
 import br.com.fiap.veti.handler.OAuth2SuccessHandler;
 import br.com.fiap.veti.service.CustomOAuth2UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,16 +18,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfigurations {
 
-    @Autowired
-    SecurityFilter securityFilter;
-
-    @Autowired
-    CustomOAuth2UserService customOAuth2UserService;
-
-    @Autowired
-    OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final SecurityFilter securityFilter;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws

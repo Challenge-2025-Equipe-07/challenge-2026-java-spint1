@@ -7,7 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,15 +17,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
+@RequiredArgsConstructor
 public class SecurityFilter extends OncePerRequestFilter {
 
     private static final String COOKIE_NAME = "veti_token";
 
-    @Autowired
-    private TokenService tokenService;
-
-    @Autowired
-    private VeterinarioRepository veterinarioRepository;
+    private final TokenService tokenService;
+    private final VeterinarioRepository veterinarioRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,

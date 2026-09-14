@@ -2,14 +2,11 @@ package br.com.fiap.veti.controller;
 
 import br.com.fiap.veti.dto.request.TutorRequest;
 import br.com.fiap.veti.dto.response.TutorResponse;
-import br.com.fiap.veti.mapper.TutorMapper;
 import br.com.fiap.veti.service.TutorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,8 +22,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Tag(name = "Tutores", description = "Gerenciamento de tutores")
 public class TutorController {
 
-    @Autowired
-    TutorService tutorService;
+    private final TutorService tutorService;
 
 
     @GetMapping("/painel")

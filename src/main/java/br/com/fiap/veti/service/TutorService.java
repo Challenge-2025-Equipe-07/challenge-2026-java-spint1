@@ -5,7 +5,7 @@ import br.com.fiap.veti.dto.response.TutorResponse;
 import br.com.fiap.veti.entity.TutorEntity;
 import br.com.fiap.veti.mapper.TutorMapper;
 import br.com.fiap.veti.repository.TutorRepository;
-import br.com.fiap.veti.service.support.EntityFinder;
+import br.com.fiap.veti.service.util.EntityFinder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;

@@ -3,7 +3,7 @@ package br.com.fiap.veti.controller;
 import br.com.fiap.veti.entity.ConsultaEntity;
 import br.com.fiap.veti.repository.ConsultaRepository;
 import br.com.fiap.veti.service.ConsultaNotificacaoService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -13,13 +13,11 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/consultas")
+@RequiredArgsConstructor
 public class ConsultaPainelController {
 
-    @Autowired
-    private ConsultaRepository consultaRepository;
-
-    @Autowired
-    private ConsultaNotificacaoService consultaNotificacaoService;
+    private final ConsultaRepository consultaRepository;
+    private final ConsultaNotificacaoService consultaNotificacaoService;
 
     @GetMapping("/painel")
     public String painel(Model model) {
