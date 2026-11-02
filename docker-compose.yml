@@ -19,7 +19,7 @@ services:
       - DB_PASSWORD=secret
       - DB_URL=jdbc:postgresql://db:5432/veti-db
       - GOOGLE_CLIENT_ID=484681037880-492aijp28gb4rndl2gi040cqj3gt0efi.apps.googleusercontent.com
-      - GOOGLE_CLIENT_SECRET=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
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
     depends_on:
       - db
 
