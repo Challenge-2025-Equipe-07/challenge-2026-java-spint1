@@ -1,0 +1,145 @@
+# Esteira CI/CD da API Veti (Opção PaaS: App Service + PostgreSQL).
+# O código deste repositório é o que a pipeline compila, testa e publica.
+#
+# Service connection ARM esperada no Azure DevOps: azure-rm-challenge
+# (Workload identity / Azure Resource Manager). O nome abaixo tem de ser o mesmo.
+#
+# Variáveis opcionais (marque DB_PASSWORD, JWT_SECRET e a connection string
+# como secret no Azure DevOps). Se ficarem vazias, o deploy não apaga os
+# App Settings que o provisionamento já gravou.
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  azureSubscription: 'azure-rm-challenge'
+  resourceGroup: 'rg-challenge-devops'
+  webAppName: 'app-ccgl-rm564113'
+  DB_URL: ''
+  DB_USER: ''
+  DB_PASSWORD: ''
+  JWT_SECRET: ''
+  APPLICATIONINSIGHTS_CONNECTION_STRING: ''
+
+stages:
+  - stage: Build
+    displayName: 'Stage 1: Build & Test (CI)'
+    jobs:
+      - job: BuildJob
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+
+          - task: JavaToolInstaller@0
+            displayName: 'Selecionar Java 21'
+            inputs:
+              versionSpec: '21'
+              jdkArchitectureOption: 'x64'
+              jdkSourceOption: 'PreInstalled'
+
+          - script: |
+              set -euo pipefail
+              chmod +x mvnw
+              ./mvnw -B test
+            displayName: 'Executar testes unitários (mvn test)'
+
+          - script: |
+              set -euo pipefail
+              ./mvnw -B package -DskipTests
+            displayName: 'Empacotar JAR'
+
+          - script: |
+              set -euo pipefail
+              mkdir -p "$(Build.ArtifactStagingDirectory)"
+              jar=$(find target -maxdepth 1 -name 'veti-*.jar' ! -name '*.original' | head -n 1)
+              if [ -z "$jar" ]; then
+                echo "JAR não gerado em target" >&2
+                exit 1
+              fi
+              cp "$jar" "$(Build.ArtifactStagingDirectory)/"
+            displayName: 'Preparar artefato JAR'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar artefato'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+
+  - stage: Deploy
+    displayName: 'Stage 2: Deploy no Azure (CD)'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployJob
+        environment: 'Production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: drop
+
+                - task: AzureCLI@2
+                  displayName: 'Injetar variáveis de ambiente e conexão do banco'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      settings=(DDL_AUTO=update)
+                      add() {
+                        local name="$1"
+                        local value="$2"
+                        if [ -n "$value" ]; then
+                          settings+=("${name}=${value}")
+                        fi
+                      }
+                      add DB_URL "${DB_URL:-}"
+                      add DB_USER "${DB_USER:-}"
+                      add DB_PASSWORD "${DB_PASSWORD:-}"
+                      add JWT_SECRET "${JWT_SECRET:-}"
+                      add APPLICATIONINSIGHTS_CONNECTION_STRING "${APPLICATIONINSIGHTS_CONNECTION_STRING:-}"
+                      az webapp config appsettings set \
+                        --resource-group "$(resourceGroup)" \
+                        --name "$(webAppName)" \
+                        --settings "${settings[@]}"
+                      subscription=$(az account show --query id -o tsv)
+                      az rest --method patch \
+                        --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/$(resourceGroup)/providers/Microsoft.Web/sites/$(webAppName)/config/web?api-version=2023-12-01" \
+                        --body '{"properties":{"healthCheckPath":"/health"}}'
+                    env:
+                      DB_URL: $(DB_URL)
+                      DB_USER: $(DB_USER)
+                      DB_PASSWORD: $(DB_PASSWORD)
+                      JWT_SECRET: $(JWT_SECRET)
+                      APPLICATIONINSIGHTS_CONNECTION_STRING: $(APPLICATIONINSIGHTS_CONNECTION_STRING)
+
+                - task: AzureCLI@2
+                  displayName: 'Implantar JAR no App Service (ARM)'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      jar=$(find "$(Pipeline.Workspace)/drop" -maxdepth 1 -name 'veti-*.jar' ! -name '*.original' | head -n 1)
+                      if [ -z "$jar" ]; then
+                        echo "JAR não encontrado no artefato drop" >&2
+                        exit 1
+                      fi
+                      az webapp deploy \
+                        --resource-group "$(resourceGroup)" \
+                        --name "$(webAppName)" \
+                        --src-path "$jar" \
+                        --type jar
