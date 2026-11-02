@@ -118,12 +118,12 @@ stages:
                       az rest --method patch \
                         --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/$(resourceGroup)/providers/Microsoft.Web/sites/$(webAppName)/config/web?api-version=2023-12-01" \
                         --body '{"properties":{"healthCheckPath":"/health"}}'
-                    env:
-                      DB_URL: $(DB_URL)
-                      DB_USER: $(DB_USER)
-                      DB_PASSWORD: $(DB_PASSWORD)
-                      JWT_SECRET: $(JWT_SECRET)
-                      APPLICATIONINSIGHTS_CONNECTION_STRING: $(APPLICATIONINSIGHTS_CONNECTION_STRING)
+                  env:
+                    DB_URL: $(DB_URL)
+                    DB_USER: $(DB_USER)
+                    DB_PASSWORD: $(DB_PASSWORD)
+                    JWT_SECRET: $(JWT_SECRET)
+                    APPLICATIONINSIGHTS_CONNECTION_STRING: $(APPLICATIONINSIGHTS_CONNECTION_STRING)
 
                 - task: AzureCLI@2
                   displayName: 'Implantar JAR no App Service (ARM)'
