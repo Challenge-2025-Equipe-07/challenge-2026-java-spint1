@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: veti
+          POSTGRES_PASSWORD: veti
+          POSTGRES_DB: veti-db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U veti"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Testes unitários (AAA, sem banco)
+        run: ./mvnw -B test
+
+      - name: Gerar JAR
+        run: ./mvnw -B -DskipTests package
+
+      - name: Subir API
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/veti-db
+          DB_USER: veti
+          DB_PASSWORD: veti
+          JWT_SECRET: ci-secret
+        run: |
+          nohup java -jar target/veti-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/health && exit 0
+            sleep 2
+          done
+          cat app.log
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Testes de API (Newman)
+        run: |
+          npx --yes newman@6 run api-tests/veti.postman_collection.json \
+            --env-var baseUrl=http://localhost:8080/veti \
+            --env-var healthUrl=http://localhost:8080/health
+
+      - name: Logs da API
+        if: always()
+        run: tail -n 200 app.log || true
