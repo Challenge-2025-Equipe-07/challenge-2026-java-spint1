@@ -1,0 +1,212 @@
+{
+  "info": {
+    "name": "Veti API - testes automatizados",
+    "description": "Fluxo core da Veti executado com Newman: health, registro/login JWT, criar tutor, criar pet (FK tutor), criar e excluir consulta, e limpeza. Os dados são gerados por execução (e-mail/CPF únicos), então a collection pode rodar várias vezes no mesmo banco.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/veti" },
+    { "key": "healthUrl", "value": "http://localhost:8080/health" }
+  ],
+  "item": [
+    {
+      "name": "01 - Health check (API + PostgreSQL)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": "{{healthUrl}}"
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "exec": [
+          "pm.test('status 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.test('aplicação UP', () => pm.expect(body.status).to.eql('UP'));",
+          "pm.test('banco de dados UP', () => pm.expect(body.components.db.status).to.eql('UP'));",
+          "pm.test('correlation id devolvido', () => pm.response.to.have.header('X-Correlation-Id'));"
+        ] }
+      }]
+    },
+    {
+      "name": "02 - Registrar veterinário",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/register",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{vetEmail}}\",\n  \"password\": \"{{vetPassword}}\",\n  \"role\": \"ADMIN\"\n}" }
+      },
+      "event": [
+        { "listen": "prerequest", "script": { "exec": [
+          "const run = Date.now().toString();",
+          "pm.collectionVariables.set('run', run);",
+          "pm.collectionVariables.set('vetEmail', `vet.${run}@veti.test`);",
+          "pm.collectionVariables.set('vetPassword', `Senha@${run}`);"
+        ] } },
+        { "listen": "test", "script": { "exec": [
+          "pm.test('status 200', () => pm.response.to.have.status(200));"
+        ] } }
+      ]
+    },
+    {
+      "name": "03 - Login JWT",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{vetEmail}}\",\n  \"password\": \"{{vetPassword}}\"\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "const token = pm.response.json().token;",
+        "pm.test('retorna token JWT', () => pm.expect(token).to.be.a('string').and.match(/^[\\w-]+\\.[\\w-]+\\.[\\w-]+$/));",
+        "pm.collectionVariables.set('token', token);"
+      ] } }]
+    },
+    {
+      "name": "04 - Criar tutor sem token é bloqueado",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/tutores",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sem Token\",\n  \"email\": \"semtoken@veti.test\",\n  \"phone\": \"11900000000\",\n  \"cpf\": \"00000000000\"\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 403', () => pm.response.to.have.status(403));"
+      ] } }]
+    },
+    {
+      "name": "05 - Obter id do veterinário logado",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/veterinarios?size=1000"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "const vet = pm.response.json().content.find(v => v.email === pm.collectionVariables.get('vetEmail'));",
+        "pm.test('veterinário registrado aparece na listagem', () => pm.expect(vet).to.exist);",
+        "pm.collectionVariables.set('vetId', vet.id);"
+      ] } }]
+    },
+    {
+      "name": "06 - Criar tutor",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/tutores",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Tutor Newman\",\n  \"email\": \"tutor.{{run}}@veti.test\",\n  \"phone\": \"11912345678\",\n  \"cpf\": \"{{cpf}}\"\n}" }
+      },
+      "event": [
+        { "listen": "prerequest", "script": { "exec": [
+          "pm.collectionVariables.set('cpf', pm.collectionVariables.get('run').slice(-11).padStart(11, '0'));"
+        ] } },
+        { "listen": "test", "script": { "exec": [
+          "pm.test('status 201', () => pm.response.to.have.status(201));",
+          "const body = pm.response.json();",
+          "pm.test('tutor criado com id', () => pm.expect(body.id).to.be.a('number'));",
+          "pm.test('dados persistidos', () => pm.expect(body.cpf).to.eql(pm.collectionVariables.get('cpf')));",
+          "pm.collectionVariables.set('tutorId', body.id);"
+        ] } }
+      ]
+    },
+    {
+      "name": "07 - Criar pet vinculado ao tutor (FK)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/pets",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Rex\",\n  \"raca\": \"BEAGLE\",\n  \"peso\": 12.5,\n  \"idade\": 3,\n  \"castrado\": true,\n  \"idTutor\": {{tutorId}}\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 201', () => pm.response.to.have.status(201));",
+        "const body = pm.response.json();",
+        "pm.test('pet referencia o tutor criado', () => pm.expect(body.idTutor).to.eql(Number(pm.collectionVariables.get('tutorId'))));",
+        "pm.collectionVariables.set('petId', body.id);"
+      ] } }]
+    },
+    {
+      "name": "08 - Criar pet com tutor inexistente (FK inválida)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/pets",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Orfao\",\n  \"raca\": \"BEAGLE\",\n  \"peso\": 5,\n  \"idade\": 1,\n  \"castrado\": false,\n  \"idTutor\": 999999999\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 404', () => pm.response.to.have.status(404));",
+        "pm.test('mensagem de tutor não encontrado', () => pm.expect(pm.response.json().mensagem).to.include('Tutor'));"
+      ] } }]
+    },
+    {
+      "name": "09 - Criar consulta",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/consultas",
+        "body": { "mode": "raw", "raw": "{\n  \"dataConsulta\": \"{{dataConsulta}}\",\n  \"idVeterinario\": {{vetId}},\n  \"idPet\": {{petId}},\n  \"descricao\": \"Vacina V10\"\n}" }
+      },
+      "event": [
+        { "listen": "prerequest", "script": { "exec": [
+          "const d = new Date(Date.now() + 30 * 24 * 3600 * 1000);",
+          "pm.collectionVariables.set('dataConsulta', d.toISOString().slice(0, 19));"
+        ] } },
+        { "listen": "test", "script": { "exec": [
+          "pm.test('status 201', () => pm.response.to.have.status(201));",
+          "const body = pm.response.json();",
+          "pm.test('consulta liga pet, tutor e veterinário', () => {",
+          "  pm.expect(body.petId).to.eql(Number(pm.collectionVariables.get('petId')));",
+          "  pm.expect(body.tutorId).to.eql(Number(pm.collectionVariables.get('tutorId')));",
+          "  pm.expect(body.veterinarioId).to.eql(Number(pm.collectionVariables.get('vetId')));",
+          "});",
+          "pm.collectionVariables.set('consultaId', body.id);"
+        ] } }
+      ]
+    },
+    {
+      "name": "10 - Excluir consulta",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/consultas/{{consultaId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 204', () => pm.response.to.have.status(204));"
+      ] } }]
+    },
+    {
+      "name": "11 - Consulta excluída não é mais encontrada",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/consultas/{{consultaId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 404', () => pm.response.to.have.status(404));"
+      ] } }]
+    },
+    {
+      "name": "12 - Limpeza: excluir pet",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/pets/{{petId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 204', () => pm.response.to.have.status(204));"
+      ] } }]
+    },
+    {
+      "name": "13 - Limpeza: excluir tutor",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/tutores/{{tutorId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 204', () => pm.response.to.have.status(204));"
+      ] } }]
+    }
+  ]
+}

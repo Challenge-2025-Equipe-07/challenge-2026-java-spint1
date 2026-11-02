@@ -10,7 +10,9 @@ import br.com.fiap.veti.repository.ConsultaRepository;
 import br.com.fiap.veti.repository.PetRepository;
 import br.com.fiap.veti.repository.VeterinarioRepository;
 import br.com.fiap.veti.service.util.EntityFinder;
+import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -18,7 +20,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
+@Observed(name = "veti.service")
 @RequiredArgsConstructor
 public class ConsultaService {
 
@@ -47,6 +51,7 @@ public class ConsultaService {
                 .stream()
                 .anyMatch(c -> c.getDataConsulta().equals(request.dataConsulta()));
         if (jaExiste) {
+            log.warn("Conflito de agenda: veterinarioId={} data={}", request.idVeterinario(), request.dataConsulta());
             throw new IllegalArgumentException("Veterinário já possui consulta nessa data");
         }
 
@@ -55,7 +60,9 @@ public class ConsultaService {
                 .pet(pet)
                 .veterinario(vet)
                 .build();
-        return mapper.toResponse(consultaRepository.save(consulta));
+        ConsultaEntity salva = consultaRepository.save(consulta);
+        log.info("Consulta criada id={} petId={} veterinarioId={}", salva.getId(), pet.getId(), vet.getId());
+        return mapper.toResponse(salva);
     }
 
     @Transactional
@@ -67,13 +74,16 @@ public class ConsultaService {
         consulta.setDataConsulta(request.dataConsulta());
         consulta.setPet(pet);
         consulta.setVeterinario(vet);
-        return mapper.toResponse(consultaRepository.save(consulta));
+        ConsultaEntity salva = consultaRepository.save(consulta);
+        log.info("Consulta atualizada id={}", id);
+        return mapper.toResponse(salva);
     }
 
     @Transactional
     @CacheEvict(value = {"consultas", "consulta"}, allEntries = true)
     public void deletar(Long id) {
         consultaRepository.delete(buscarEntidade(id));
+        log.info("Consulta removida id={}", id);
     }
 
     private ConsultaEntity buscarEntidade(Long id) {

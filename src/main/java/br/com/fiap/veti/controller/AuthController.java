@@ -11,11 +11,13 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,10 +37,13 @@ public class AuthController {
     private final VeterinarioMapper veterinarioMapper;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
+    private final ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository;
 
     @GetMapping("/login")
     public ModelAndView loginPage() {
-        return new ModelAndView("login");
+        var mv = new ModelAndView("login");
+        mv.addObject("googleEnabled", clientRegistrationRepository.getIfAvailable() != null);
+        return mv;
     }
 
 
