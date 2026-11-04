@@ -76,6 +76,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+        <!--Envio de e-mail (SMTP)-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
         <!--Observabilidade-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -120,8 +125,8 @@
 		</dependency>
 		<!--Database-->
 		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
+			<groupId>com.oracle.database.jdbc</groupId>
+			<artifactId>ojdbc17</artifactId>
 			<scope>runtime</scope>
 		</dependency>
 		<!--Frontend-->

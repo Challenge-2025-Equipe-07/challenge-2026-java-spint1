@@ -1,24 +1,66 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title>Veti - Veterinários</title>
-</head>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:replace="~{fragments/layout :: head('Equipe')}"></head>
 <body>
-<h1>Veterinários cadastrados</h1>
-<table border="1" cellpadding="8">
-    <thead>
-    <tr>
-        <th>ID</th>
-        <th>E-mail</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr th:each="vet : ${veterinarios}">
-        <td th:text="${vet.id}"></td>
-        <td th:text="${vet.email}"></td>
-    </tr>
-    </tbody>
-</table>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="container">
+    <div class="page-header">
+        <div>
+            <h1>Equipe</h1>
+            <p>Contas de acesso dos veterinários. Somente administradores veem esta tela.</p>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: mensagens}"></div>
+
+    <div class="grid">
+        <section class="card">
+            <h2>Nova conta</h2>
+            <form th:action="@{/veterinarios/painel}" method="post" novalidate>
+                <div class="field" th:classappend="${erros['email'] != null} ? 'invalido'">
+                    <label for="email">E-mail</label>
+                    <input id="email" type="email" name="email" th:value="${form?.email}" required>
+                    <div class="erro" th:if="${erros['email'] != null}" th:text="${erros['email']}"></div>
+                </div>
+                <div class="field" th:classappend="${erros['password'] != null} ? 'invalido'">
+                    <label for="password">Senha inicial</label>
+                    <input id="password" type="password" name="password" minlength="8" required>
+                    <div class="erro" th:if="${erros['password'] != null}" th:text="${erros['password']}"></div>
+                </div>
+                <div class="field">
+                    <label for="role">Perfil</label>
+                    <select id="role" name="role">
+                        <option value="USER" th:selected="${form == null or form.role?.name() == 'USER'}">Veterinário (USER)</option>
+                        <option value="ADMIN" th:selected="${form != null and form.role?.name() == 'ADMIN'}">Administrador (ADMIN)</option>
+                    </select>
+                    <div class="dica">USER agenda e notifica consultas; ADMIN também cadastra tutores, pets e a equipe.</div>
+                </div>
+                <div class="form-acoes"><button type="submit" class="btn add">Criar conta</button></div>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Contas (<span th:text="${#lists.size(veterinarios)}">0</span>)</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>E-mail</th>
+                        <th>Perfil</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="vet : ${veterinarios}">
+                        <td th:text="${vet.email}"></td>
+                        <td><span class="badge" th:classappend="${vet.role == 'ADMIN'} ? 'admin' : 'user'"
+                                  th:text="${vet.role}"></span></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</main>
 </body>
 </html>

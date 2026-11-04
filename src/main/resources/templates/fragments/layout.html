@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:fragment="head(titulo)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${titulo} + ' | Veti'">Veti</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+    <link rel="stylesheet" th:href="@{/css/veti.css}">
+</head>
+<body>
+
+<header th:fragment="topbar" class="topbar">
+    <div class="topbar-inner">
+        <a class="icon-btn" th:if="${usuario != null and usuario.admin}" th:href="@{/veterinarios/painel}"
+           title="Equipe e configurações" aria-label="Equipe e configurações">
+            <img th:src="@{/img/icon-settings.svg}" alt="">
+        </a>
+        <a class="brand" th:href="@{/}" aria-label="Veti, início">
+            <img th:src="@{/img/logo-veti-small.svg}" alt="Veti">
+        </a>
+        <nav class="nav" aria-label="Navegação principal">
+            <a th:href="@{/}" th:classappend="${pagina == 'inicio'} ? 'ativo'" title="Início">
+                <span class="nav-icon i-home"></span><span class="rotulo">Início</span></a>
+            <a th:href="@{/consultas/painel}" th:classappend="${pagina == 'consultas'} ? 'ativo'" title="Consultas">
+                <span class="nav-icon i-agenda"></span><span class="rotulo">Consultas</span></a>
+            <a th:href="@{/tutores/painel}" th:classappend="${pagina == 'tutores'} ? 'ativo'" title="Tutores">
+                <span class="nav-icon i-add"></span><span class="rotulo">Tutores</span></a>
+            <a th:href="@{/pets/painel}" th:classappend="${pagina == 'pets'} ? 'ativo'" title="Pets">
+                <span class="nav-icon i-pets"></span><span class="rotulo">Pets</span></a>
+            <a th:if="${usuario != null and usuario.admin}" th:href="@{/relatorios/painel}"
+               th:classappend="${pagina == 'relatorios'} ? 'ativo'" title="Relatórios">
+                <span class="nav-icon i-relatorios"></span><span class="rotulo">Relatórios</span></a>
+        </nav>
+        <div class="user-box" th:if="${usuario != null}">
+            <span class="email" th:text="${usuario.email}">vet@veti.com</span>
+            <span class="badge" th:classappend="${usuario.admin} ? 'admin' : 'user'"
+                  th:text="${usuario.admin} ? 'ADMIN' : 'VET'">perfil</span>
+            <form th:action="@{/auth/logout}" method="post">
+                <button type="submit" class="btn ghost small">Sair</button>
+            </form>
+        </div>
+    </div>
+</header>
+
+<div th:fragment="mensagens">
+    <div class="alert sucesso" th:if="${sucesso}" th:text="${sucesso}"></div>
+    <div class="alert erro" th:if="${erro}" th:text="${erro}"></div>
+</div>
+
+</body>
+</html>

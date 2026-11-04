@@ -34,13 +34,13 @@ public class TutorEntity {
 
     @NotBlank(message = "CPF é obrigatório")
     @Size(min = 11, max = 11, message = "CPF deve ter exatamente 11 caracteres")
-    @Column(name = "DS_CPF", nullable = false, length = 11, unique = true)
+    @Column(name = "DS_CPF", nullable = false, length = 11)
     private String cpf;
 
     @NotBlank(message = "E-mail é obrigatório")
     @Email(message = "E-mail inválido")
     @Size(max = 320, message = "E-mail deve ter no máximo 320 caracteres")
-    @Column(name = "DS_EMAIL", nullable = false, length = 320, unique = true)
+    @Column(name = "DS_EMAIL", nullable = false, length = 320)
     private String email;
 
     @Size(max = 13, message = "Telefone deve ter no máximo 13 caracteres")

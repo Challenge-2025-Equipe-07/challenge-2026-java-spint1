@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:replace="~{fragments/layout :: head('Início')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="container">
+    <div class="page-header">
+        <div>
+            <h1 th:text="${#temporals.hour(#temporals.createNow()) < 12} ? 'Bom dia!' : (${#temporals.hour(#temporals.createNow()) < 18} ? 'Boa tarde!' : 'Boa noite!')">Bom dia!</h1>
+            <p th:text="${consultasHoje == 1} ? 'Temos 1 consulta agendada hoje' : |Temos ${consultasHoje} consultas agendadas hoje|">Temos 0 consultas agendadas hoje</p>
+        </div>
+        <a class="btn add" th:href="@{/consultas/painel}">Agendar consulta</a>
+    </div>
+
+    <div class="grid">
+        <div>
+            <section class="destaque" th:unless="${#lists.isEmpty(proximas)}" th:with="c=${proximas[0]}">
+                <div class="item">
+                    <div class="item-info">
+                        <div>
+                            <div class="item-nome" th:text="|${c.pet.nome} (${c.pet.raca})|">Rupert (SRD)</div>
+                            <div class="item-sub" th:text="|Responsável - ${c.pet.tutor.nome}|">Responsável - Clara</div>
+                        </div>
+                        <div class="item-tag" th:text="${c.veterinario.email}">vet@veti.com</div>
+                    </div>
+                    <div class="item-hora">
+                        <small th:text="${#temporals.format(c.dataConsulta, 'dd/MM/yy')}">12/04/26</small>
+                        <span th:text="${#temporals.format(c.dataConsulta, 'HH:mm')}">15:00</span>
+                    </div>
+                </div>
+                <a class="destaque-link" th:href="@{/pets/painel}">
+                    <span>Detalhes do pet</span><i class="chevron"></i>
+                </a>
+            </section>
+
+            <section class="stats">
+                <a class="card stat" th:href="@{/consultas/painel}">
+                    <div class="label">Agendadas</div>
+                    <div class="valor" th:text="${consultasFuturas}">0</div>
+                </a>
+                <a class="card stat" th:href="@{/pets/painel}">
+                    <div class="label">Pets</div>
+                    <div class="valor" th:text="${totalPets}">0</div>
+                </a>
+                <a class="card stat" th:href="@{/tutores/painel}">
+                    <div class="label">Tutores</div>
+                    <div class="valor" th:text="${totalTutores}">0</div>
+                </a>
+                <a class="card stat" th:if="${usuario != null and usuario.admin}" th:href="@{/veterinarios/painel}">
+                    <div class="label">Equipe</div>
+                    <div class="valor" th:text="${totalVeterinarios}">0</div>
+                </a>
+            </section>
+        </div>
+
+        <section>
+            <h2 class="secao-titulo">Próximas consultas</h2>
+            <div class="lista">
+                <a class="item" th:each="c : ${proximas}" th:href="@{/consultas/painel}">
+                    <div class="item-info">
+                        <div>
+                            <div class="item-nome" th:text="|${c.pet.nome} (${c.pet.raca})|">Linda (Gato)</div>
+                            <div class="item-sub" th:text="|Responsável - ${c.pet.tutor.nome}|">Responsável - Pedro</div>
+                        </div>
+                        <div class="item-tag" th:text="${c.veterinario.email}">vet@veti.com</div>
+                    </div>
+                    <div class="item-hora">
+                        <small th:text="${#temporals.format(c.dataConsulta, 'dd/MM')}">12/08</small>
+                        <span th:text="${#temporals.format(c.dataConsulta, 'HH:mm')}">16:00</span>
+                    </div>
+                    <i class="chevron"></i>
+                </a>
+                <div class="card vazio" th:if="${#lists.isEmpty(proximas)}">Nenhuma consulta agendada.</div>
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>

@@ -1,22 +1,32 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title>Veti - Login</title>
-</head>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:replace="~{fragments/layout :: head('Entrar')}"></head>
 <body>
-<div class="login-container">
-    <h1>Bem-vindo à Veti</h1>
+<main class="login-page">
+    <div class="login-card">
+        <img class="logo" th:src="@{/img/logo-veti.svg}" alt="Veti">
 
-    <form th:action="@{/auth/login}" method="post">
-        <input type="email" name="email" placeholder="E-mail" required>
-        <input type="password" name="password" placeholder="Senha" required>
-        <button type="submit">Entrar</button>
-    </form>
+        <form th:action="@{/auth/login}" method="post">
+            <div class="alert erro" th:if="${erro}">E-mail ou senha inválidos.</div>
+            <div class="alert info" th:if="${saiu}">Você saiu da sua conta.</div>
 
-    <div th:if="${googleEnabled}" class="divider">ou</div>
+            <div class="field">
+                <label for="email">Email</label>
+                <input id="email" type="email" name="email" placeholder="cliente@mail.com" required autofocus>
+            </div>
+            <div class="field">
+                <label for="password">Senha</label>
+                <input id="password" type="password" name="password" placeholder="********" required>
+            </div>
+            <button type="submit" class="btn block">Entrar</button>
 
-    <a th:if="${googleEnabled}" th:href="@{/oauth2/authorization/google}">Entrar com Google</a>
-</div>
+            <div class="login-extra" th:if="${googleEnabled}">
+                <div class="divider">ou</div>
+                <a class="btn ghost block" th:href="@{/oauth2/authorization/google}">Entrar com Google</a>
+            </div>
+            <p class="login-rodape">Acesso restrito à equipe da clínica</p>
+        </form>
+    </div>
+</main>
 </body>
 </html>

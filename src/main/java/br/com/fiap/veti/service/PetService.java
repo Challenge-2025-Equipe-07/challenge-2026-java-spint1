@@ -48,7 +48,7 @@ public class PetService {
                 .raca(request.raca().name())
                 .peso(request.peso())
                 .idade(request.idade())
-                .castrado(request.castrado())
+                .castrado(Boolean.TRUE.equals(request.castrado()))
                 .tutor(tutor)
                 .build();
         PetEntity salvo = petRepository.save(pet);
@@ -65,7 +65,7 @@ public class PetService {
         pet.setRaca(request.raca().name());
         pet.setPeso(request.peso());
         pet.setIdade(request.idade());
-        pet.setCastrado(request.castrado());
+        pet.setCastrado(Boolean.TRUE.equals(request.castrado()));
         pet.setTutor(tutor);
         PetEntity salvo = petRepository.save(pet);
         log.info("Pet atualizado id={}", id);

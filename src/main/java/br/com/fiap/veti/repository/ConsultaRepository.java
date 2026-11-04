@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,4 +30,14 @@ public interface ConsultaRepository extends JpaRepository<ConsultaEntity, Long> 
             "JOIN FETCH c.veterinario " +
             "ORDER BY c.dataConsulta")
     List<ConsultaEntity> findAllComPetETutor();
+
+    @Query("SELECT c FROM ConsultaEntity c " +
+            "JOIN FETCH c.pet p " +
+            "JOIN FETCH p.tutor " +
+            "JOIN FETCH c.veterinario " +
+            "WHERE c.dataConsulta >= :inicio " +
+            "ORDER BY c.dataConsulta")
+    List<ConsultaEntity> findProximasComPetETutor(LocalDateTime inicio);
+
+    long countByDataConsultaGreaterThanEqual(LocalDateTime inicio);
 }

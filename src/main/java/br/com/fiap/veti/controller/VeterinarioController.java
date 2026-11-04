@@ -6,12 +6,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.ModelAndView;
 
 @RestController
 @RequestMapping("/veterinarios")
@@ -20,15 +18,6 @@ import org.springframework.web.servlet.ModelAndView;
 public class VeterinarioController {
 
     private final VeterinarioService veterinarioService;
-
-    @GetMapping("/painel")
-    @Operation(summary = "Painel HTML com lista de veterinários")
-    public ModelAndView painel() {
-        var veterinarios = veterinarioService.listarTodos(PageRequest.of(0, 100, org.springframework.data.domain.Sort.by("email")));
-        var mv = new ModelAndView("veterinarios-painel");
-        mv.addObject("veterinarios", veterinarios.getContent());
-        return mv;
-    }
 
     @GetMapping
     @Operation(summary = "Listar todos os veterinários paginados")

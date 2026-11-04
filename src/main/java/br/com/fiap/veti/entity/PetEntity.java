@@ -31,7 +31,7 @@ public class PetEntity {
 
     @NotNull(message = "Peso é obrigatório")
     @DecimalMin(value = "0.0", inclusive = false, message = "Peso deve ser maior que zero")
-    @Column(name = "DS_PESO", nullable = false, precision = 5)
+    @Column(name = "DS_PESO", nullable = false, columnDefinition = "NUMBER(5,2)")
     private Double peso;
 
     @NotNull(message = "Idade é obrigatória")
