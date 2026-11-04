@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Segredos e dados locais ###
+.env
+data/
+*.mv.db

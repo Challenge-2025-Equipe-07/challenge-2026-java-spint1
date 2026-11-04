@@ -10,19 +10,19 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      postgres:
-        image: postgres:17-alpine
+      oracle:
+        image: gvenzl/oracle-free:23-slim-faststart
         env:
-          POSTGRES_USER: veti
-          POSTGRES_PASSWORD: veti
-          POSTGRES_DB: veti-db
+          ORACLE_PASSWORD: ci-oracle
+          APP_USER: veti
+          APP_USER_PASSWORD: veti
         ports:
-          - 5432:5432
+          - 1521:1521
         options: >-
-          --health-cmd "pg_isready -U veti"
-          --health-interval 5s
+          --health-cmd healthcheck.sh
+          --health-interval 10s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries 30
 
     steps:
       - uses: actions/checkout@v4
@@ -41,13 +41,15 @@ jobs:
 
       - name: Subir API
         env:
-          DB_URL: jdbc:postgresql://localhost:5432/veti-db
+          DB_URL: jdbc:oracle:thin:@//localhost:1521/FREEPDB1
           DB_USER: veti
           DB_PASSWORD: veti
           JWT_SECRET: ci-secret
+          ADMIN_EMAIL: admin@veti.test
+          ADMIN_PASSWORD: Admin@ci-123
         run: |
           nohup java -jar target/veti-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
             curl -sf http://localhost:8080/health && exit 0
             sleep 2
           done
@@ -62,7 +64,9 @@ jobs:
         run: |
           npx --yes newman@6 run api-tests/veti.postman_collection.json \
             --env-var baseUrl=http://localhost:8080/veti \
-            --env-var healthUrl=http://localhost:8080/health
+            --env-var healthUrl=http://localhost:8080/health \
+            --env-var adminEmail=admin@veti.test \
+            --env-var adminPassword=Admin@ci-123
 
       - name: Logs da API
         if: always()
