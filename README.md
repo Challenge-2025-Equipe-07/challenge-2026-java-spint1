@@ -13,10 +13,10 @@ Solução do **Challenge 2026 (FIAP · 2TDS · Clyvo Vet)** na disciplina **Java
 
 | Nome                | RM            |
 |---------------------|---------------|
-| _Carlos André_      | _<RM> 564968_ |
-| _Camilo Michelleto_ | _<RM>_        |
-| _Guilherme Costa_   | _<RM> 562700_ |
-| _Laura Silva_       | _<RM>_        |
+| Carlos André        | 564968 |
+| Camilo Michelleto   | 564113 |
+| Guilherme Costa     | 562700 |
+| Laura Silva         | 566376 |
 
 ## O problema e a proposta
 
