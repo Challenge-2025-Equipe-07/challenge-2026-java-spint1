@@ -42,7 +42,6 @@ body {
     position: relative;
 }
 
-/* Gradiente lilás do design, por baixo de todo o conteúdo */
 body::before {
     content: "";
     position: fixed;

@@ -3,5 +3,14 @@
 {$APP_DOMAIN} {
 	encode gzip
 	redir / /veti/ 302
+
+	# Vindo do CloudFront: ele manda o dominio publico (ex.: veti.seudominio.com) em X-Forwarded-Host,
+	# e a app usa esse dominio nos redirects (login, logout, OAuth Google).
+	@cdn header X-Forwarded-Host *
+	reverse_proxy @cdn app:8080 {
+		header_up X-Forwarded-Host {header.X-Forwarded-Host}
+	}
+
+	# Acesso direto pelo sslip.io
 	reverse_proxy app:8080
 }

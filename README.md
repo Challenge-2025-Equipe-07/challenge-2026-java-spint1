@@ -4,10 +4,10 @@ Solução do **Challenge 2026 (FIAP · 2TDS · Clyvo Vet)** na disciplina **Java
 
 | | |
 |---|---|
-| **Aplicação online** | _<preencher com a URL do Azure App Service, ex.: https://veti-app.azurewebsites.net/veti/>_ |
+| **Aplicação online** | https://18-207-27-110.sslip.io/veti/ (AWS: EC2 + Docker + Caddy com HTTPS) |
 | **Vídeo da apresentação** | _<preencher com o link do vídeo (máx. 15 min)>_ |
-| **Swagger (API)** | `<URL da aplicação>/veti/swagger-ui.html` |
-| **Health check** | `<URL da aplicação>/health` |
+| **Swagger (API)** | https://18-207-27-110.sslip.io/veti/swagger-ui.html |
+| **Health check** | https://18-207-27-110.sslip.io/health |
 
 ## Integrantes
 
@@ -40,7 +40,7 @@ Passeio por todas as funcionalidades em cerca de **15 minutos**, na ordem em que
 
 | O quê | Como |
 |---|---|
-| Aplicação no ar | Abra a URL da aplicação (ou http://localhost:8080/veti/ rodando local) e confira `/health` com `"status":"UP"` |
+| Aplicação no ar | Abra https://18-207-27-110.sslip.io/veti/ (ou http://localhost:8080/veti/ rodando local) e confira `/health` com `"status":"UP"` |
 | Conta de administrador | O `ADMIN_EMAIL`/`ADMIN_PASSWORD` configurado na subida |
 | E-mail do tutor de exemplo | Use um e-mail que você consiga abrir na hora (no celular, por exemplo), para mostrar o lembrete chegando. O envio precisa de `MAIL_USERNAME`/`MAIL_PASSWORD` configurados (veja [E-mail do lembrete](#e-mail-do-lembrete-gmail)) |
 | Duas janelas | Uma normal (administrador) e uma anônima (veterinário), para alternar entre os perfis sem sair da conta |
@@ -93,9 +93,13 @@ O primeiro ADMIN é criado na subida da aplicação a partir de `ADMIN_EMAIL`/`A
 ```
 Navegador (Thymeleaf) ─┐                                         ┌─> Repositories (JPA) ─────────┐
                        ├─> Spring Security ─> Controllers ─> Services                          ├─> Oracle 23ai Free
-Cliente REST / Mobile ─┘   (JWT + OAuth2)      (web e REST)  (regras, └─> PKG_VETI (SimpleJdbcCall) ┘   (container Docker
-                                                              cache)                                   numa EC2 da AWS)
-Azure App Service (JAR) ── Observabilidade: Actuator, OpenTelemetry, logs JSON, Application Insights
+Cliente REST / Mobile ─┘   (JWT + OAuth2)      (web e REST)  (regras, └─> PKG_VETI (SimpleJdbcCall) ┘
+                                                              cache, e-mail SMTP)
+
+Produção na AWS (uma EC2, Docker Compose):
+  Internet ─> [CloudFront, opcional: domínio próprio + cache de CSS/imagens]
+           ─> Caddy (HTTPS Let's Encrypt, :443) ─> app Spring Boot (:8080, rede interna) ─> Oracle (container, volume persistente)
+  Observabilidade: Actuator (/health), OpenTelemetry, logs JSON com traceId
 ```
 
 | Escolha | Por quê |
@@ -108,17 +112,19 @@ Azure App Service (JAR) ── Observabilidade: Actuator, OpenTelemetry, logs JS
 | **Bean Validation** com mensagens em português | Mesmas regras na API (400 com campo → mensagem) e nos formulários. |
 | **Spring Cache** nos services | Evita consultas repetidas nas listagens; invalidado a cada escrita. |
 | **Thymeleaf + CSS próprio** | Server-side rendering, sem build de frontend separado; layout responsivo. |
-| **Actuator, OpenTelemetry e logs estruturados** | Health check para o App Service e tracing de controller → service → JDBC. |
-| **Oracle 23ai Free** em container na AWS (EC2) | Mesmo banco da disciplina de Banco de Dados; a regra de DevOps aceita Oracle em container na nuvem. |
+| **Actuator, OpenTelemetry e logs estruturados** | Health check para monitorar a aplicação na AWS e tracing de controller → service → JDBC. |
+| **Oracle 23ai Free** em container na AWS (EC2) | Mesmo banco da disciplina de Banco de Dados, rodando ao lado da aplicação, com dados num volume Docker persistente. |
 | **Hibernate cria as tabelas; PL-SQL num package** (`PKG_VETI`) | O modelo fica nas entidades JPA; as regras que pertencem ao banco (validação de senha, relatórios, auditoria) ficam em PL-SQL, aplicado automaticamente na subida (`spring.sql.init`). |
 | **`SimpleJdbcCall`** para funções e procedures | Chamada nativa ao package; erros `RAISE_APPLICATION_ERROR` (ORA-20xxx) viram mensagens de negócio (409). |
-| **Azure App Service (JAR) + Azure DevOps** | Deploy PaaS sem container, com CI/CD automatizado. |
+| **AWS EC2 + Docker Compose + Caddy** | Oracle, aplicação e proxy HTTPS sobem com um único comando; o Caddy emite e renova o certificado sozinho. |
+| **CloudFront (CDN)** | URL personalizada com certificado do ACM e cache dos arquivos estáticos, sem mudar a EC2. |
+| **GitHub Actions** | CI a cada push: testes unitários, build e testes de API contra um Oracle em container. |
 
 ## Integração com as demais disciplinas
 
 | Disciplina | Como aparece na solução | Evidência |
 |---|---|---|
-| DevOps Tools & Cloud Computing | Pipeline CI/CD e deploy no Azure App Service | [azure-pipelines.yml](azure-pipelines.yml) |
+| DevOps Tools & Cloud Computing | CI no GitHub Actions e deploy na AWS: EC2 com Docker Compose (Oracle + app + Caddy HTTPS) e CloudFront para a URL personalizada | [ci.yml](.github/workflows/ci.yml), [docker-compose.aws.yml](docker-compose.aws.yml), [Caddyfile](Caddyfile), [Dockerfile](Dockerfile) |
 | Compliance, QA & Tests | Testes unitários (JUnit/Mockito, AAA) e de API (Newman) rodando no CI | [src/test](src/test), [api-tests](api-tests) |
 | Mastering Relational and Non-Relational Database | A API usa o Oracle como banco principal e chama o package `PKG_VETI` (funções `FN_MONTA_JSON` e `FN_VALIDA_SENHA`, procedures `PRC_CONSULTAS_JSON` e `PRC_RESUMO_CONSULTAS`); a trigger `TRG_AUDITORIA_CONSULTA` audita as consultas | [MER/DER](docs/der.md), [DDL](docs/ddl-oracle.sql), [pkg_veti.sql](src/main/resources/db/pkg_veti.sql), [VetiPackageRepository](src/main/java/br/com/fiap/veti/repository/procedure/VetiPackageRepository.java) |
 
@@ -140,31 +146,9 @@ Pré-requisitos: Docker (ou Java 21 + um Oracle 19c ou superior acessível).
 
 Para consultar o banco (SQL Developer, DBeaver ou `sqlplus`): host `localhost`, porta `1521`, serviço `FREEPDB1`, usuário e senha do `DB_USER`/`DB_PASSWORD`.
 
-## Banco Oracle na AWS (container numa EC2)
+## Deploy na AWS (EC2 com HTTPS)
 
-O banco de produção é o mesmo container `gvenzl/oracle-free`, rodando numa EC2.
-
-1. **EC2**: Amazon Linux 2023 ou Ubuntu, **t3.small ou maior** (o Oracle Free precisa de cerca de 2 GB de RAM; a t3.micro não basta), disco de 20 GB.
-2. **IP fixo**: associe um *Elastic IP* à instância, para a `DB_URL` não mudar quando a EC2 reiniciar.
-3. **Security Group**: libere a porta **1521** apenas para os *Outbound IP addresses* do Web App (Portal do Azure → Web App → Propriedades) e para o IP da equipe. Libere a 22 (SSH) só para o IP da equipe.
-4. **Docker e container** (na EC2):
-
-   ```bash
-   sudo dnf install -y docker && sudo systemctl enable --now docker
-   sudo docker volume create veti-oradata
-   sudo docker run -d --name veti-oracle --restart unless-stopped -p 1521:1521 \
-     -e ORACLE_PASSWORD='<senha-sys>' -e APP_USER=veti -e APP_USER_PASSWORD='<senha-app>' \
-     -v veti-oradata:/opt/oracle/oradata gvenzl/oracle-free:23-slim
-   sudo docker logs -f veti-oracle   # aguarde "DATABASE IS READY TO USE!"
-   ```
-
-5. **Aplicação**: no variable group `veti-secrets` e nas *Configurações do aplicativo* do Web App, use
-   `DB_URL=jdbc:oracle:thin:@//<elastic-ip>:1521/FREEPDB1`, `DB_USER=veti` e `DB_PASSWORD=<senha-app>`.
-   Na primeira subida, o Hibernate cria as tabelas e a API aplica o `pkg_veti.sql` (package, trigger e `TB_AUDITORIA`).
-
-## Deploy completo na AWS (EC2 com HTTPS)
-
-Oracle, aplicação e um proxy **Caddy** (HTTPS automático com Let's Encrypt) rodam numa única EC2, a partir do [docker-compose.yml](docker-compose.yml) mais o [docker-compose.aws.yml](docker-compose.aws.yml).
+Produção: **https://18-207-27-110.sslip.io/veti/**. Oracle, aplicação e um proxy **Caddy** (HTTPS automático com Let's Encrypt) rodam numa única EC2, a partir do [docker-compose.yml](docker-compose.yml) mais o [docker-compose.aws.yml](docker-compose.aws.yml). Na primeira subida, o Hibernate cria as tabelas e a API aplica o `pkg_veti.sql` (package, trigger e `TB_AUDITORIA`); os dados ficam no volume Docker `veti-oradata`.
 
 1. **EC2**: Amazon Linux 2023, **t3.medium** (4 GB: o Oracle usa cerca de 2 GB), disco de 30 GB gp3, com um **Elastic IP** associado.
 2. **Security Group**:
@@ -194,9 +178,38 @@ Oracle, aplicação e um proxy **Caddy** (HTTPS automático com Let's Encrypt) r
    ```
 
    A primeira subida leva de 5 a 10 minutos (build do JAR e criação do banco).
-6. **Testar**: `https://<APP_DOMAIN>/health` e `https://<APP_DOMAIN>/veti/`. Para o login Google, cadastre `https://<APP_DOMAIN>/veti/login/oauth2/code/google` no Google Cloud.
+6. **Testar**: `https://<APP_DOMAIN>/health` e `https://<APP_DOMAIN>/veti/`. Para o login Google, cadastre `https://<APP_DOMAIN>/veti/login/oauth2/code/google` no Google Cloud (em produção: `https://18-207-27-110.sslip.io/veti/login/oauth2/code/google`).
 
-Para atualizar depois de um push: `git pull && docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d --build`.
+Para atualizar depois de um push: `git pull && docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d --build`. Logs: `docker compose logs -f app`.
+
+Para consultar o banco de produção (SQL Developer/DBeaver): host = Elastic IP da EC2, porta `1521`, serviço `FREEPDB1`, usuário e senha do `DB_USER`/`DB_PASSWORD` do `.env` da EC2 (a porta só abre para o IP liberado no Security Group).
+
+### URL personalizada com CloudFront (CDN)
+
+O CloudFront fica na frente da EC2, atende pelo domínio da equipe (ex.: `veti.seudominio.com`) e guarda em cache o CSS e as imagens (versionados por hash). A EC2 continua sendo a origem, pelo endereço `sslip.io`.
+
+1. **Domínio**: registre um no Route 53 (*Registered domains*) ou use um que a equipe já tenha.
+2. **Certificado**: no **ACM, região `us-east-1`** (obrigatório para o CloudFront), peça um certificado público para `veti.seudominio.com`, com validação por **DNS**, e crie o registro CNAME que o ACM pede (no Route 53 há o botão *Create records in Route 53*).
+3. **Distribuição** (CloudFront → *Create distribution*):
+
+   | Campo | Valor |
+   |---|---|
+   | Origin domain | `18-207-27-110.sslip.io` (o `APP_DOMAIN` da EC2) |
+   | Protocol | **HTTPS only** |
+   | Add custom header | `X-Forwarded-Host` = `veti.seudominio.com` |
+   | Viewer protocol policy | **Redirect HTTP to HTTPS** |
+   | Allowed HTTP methods | **GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE** |
+   | Cache policy | **CachingDisabled** (telas e API são dinâmicas) |
+   | Origin request policy | **AllViewerExceptHostHeader** (repassa cookies, query string e `Authorization`) |
+   | Alternate domain name (CNAME) | `veti.seudominio.com` |
+   | Custom SSL certificate | o certificado do passo 2 |
+   | WAF | *Do not enable* |
+
+4. **Cache dos arquivos estáticos**: na aba *Behaviors*, crie dois comportamentos, `/veti/css/*` e `/veti/img/*`, com a mesma origem e a cache policy **CachingOptimized**.
+5. **DNS**: no Route 53, crie um registro **A (Alias)** `veti` apontando para a distribuição (fora do Route 53, um **CNAME** para `dxxxx.cloudfront.net`).
+6. **Google**: cadastre `https://veti.seudominio.com/veti/login/oauth2/code/google` como redirect autorizado.
+
+O header `X-Forwarded-Host` faz a aplicação montar os redirects (login, logout e OAuth) com o domínio público: o [Caddyfile](Caddyfile) repassa esse header e o Spring o lê (`server.tomcat.remoteip.host-header`). A distribuição leva de 5 a 15 minutos para ficar pronta.
 
 ## Modelo de dados
 
@@ -226,8 +239,8 @@ Para regenerar o DDL depois de mudar uma entidade, suba a aplicação uma vez co
 | `PORT` / `SERVER_PORT` | não | Porta HTTP (padrão 8080) |
 | `LOG_FORMAT` | não | Formato do log no console: `logstash` (padrão), `ecs` ou `gelf` |
 | `OTEL_EXPORT_ENABLED` | não | `true` para exportar traces e métricas via OTLP/HTTP |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | não | Endpoint do coletor OTLP (padrão `http://localhost:4318`) |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | não | Anexa o agente do Azure Application Insights (traces, métricas e logs) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | não | Endpoint do coletor OTLP (padrão `http://localhost:4318`), ex.: um AWS Distro for OpenTelemetry enviando para o CloudWatch/X-Ray |
+| `APP_DOMAIN` | só na EC2 | Domínio do HTTPS no Caddy, ex.: `18-207-27-110.sslip.io` |
 | `TRACING_SAMPLING_PROBABILITY` | não | Amostragem de traces (padrão `1.0`) |
 
 ### E-mail do lembrete (Gmail)
@@ -236,7 +249,7 @@ O botão **Notificar tutor** (e `POST /consultas/{id}/notificar-tutor`) manda ao
 
 1. Na conta Google que vai enviar, ative a **verificação em duas etapas**.
 2. Em [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords), crie uma **senha de app** (16 caracteres). O Gmail recusa a senha normal da conta por SMTP.
-3. Defina `MAIL_USERNAME=<conta>@gmail.com` e `MAIL_PASSWORD=<senha de app>` no `.env` (local) ou nas configurações do Web App/variable group (Azure).
+3. Defina `MAIL_USERNAME=<conta>@gmail.com` e `MAIL_PASSWORD=<senha de app>` no `.env` (local ou da EC2) e recrie o container com `docker compose ... up -d`.
 
 Sem essas variáveis, o lembrete só é registrado no log e a tela avisa que o envio não está configurado; é o modo usado no CI. Se o Gmail recusar o envio, a tela mostra o erro e a API responde `502`. O Gmail limita contas pessoais a cerca de 500 envios por dia.
 
@@ -284,28 +297,13 @@ npx newman run api-tests/veti.postman_collection.json --env-var baseUrl=http://l
 
 Casos cobertos: health check com banco, auto-cadastro público (o pedido de ADMIN é ignorado), login JWT, bloqueio sem token (escrita e leitura), USER impedido de cadastrar tutor, login ADMIN, senha sem número recusada pela `FN_VALIDA_SENHA` (409), criar tutor, criar pet com FK do tutor, pet com tutor inexistente (404), criar consulta, JSON da `PRC_CONSULTAS_JSON`, INSERT registrado pela trigger em `TB_AUDITORIA`, relatórios bloqueados para USER, excluir consulta (e confirmar 404) e limpeza. O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) roda tudo isso no GitHub Actions com Oracle em container.
 
-## Deploy no Azure App Service (JAR, sem container)
+## Integração contínua (GitHub Actions)
 
-```bash
-./mvnw -DskipTests package
-```
+O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) roda a cada push na `main` e em todo pull request:
 
-Publique `target/veti-0.0.1-SNAPSHOT.jar` num App Service Java SE 21, configure as variáveis acima em *Configurações do aplicativo* e defina o *Health check path* como `/health`. O `Dockerfile` e o `docker-compose.yml` servem só para desenvolvimento local.
+1. Sobe um Oracle 23ai Free em container (serviço do workflow).
+2. Roda os testes unitários e gera o JAR.
+3. Sobe a API contra esse Oracle (o `pkg_veti.sql` é aplicado na subida) e espera o `/health`.
+4. Roda os testes de API (Newman) e mostra os logs da API se algo falhar.
 
-## CI/CD no Azure DevOps
-
-A pipeline [azure-pipelines.yml](azure-pipelines.yml) dispara a cada push na `master` (ou `main`) e tem dois estágios:
-
-1. **CI**: testes unitários → JAR → sobe a API contra um Oracle de teste (container) → testes de API (Newman) → publica os resultados dos testes e o artefato `drop` (`app.jar`).
-2. **CD**: roda só se o CI gerar o artefato e faz o deploy no Azure Web App (Linux, Java SE 21), aplicando as variáveis da aplicação.
-
-Configuração necessária no projeto do Azure DevOps:
-
-| Item | Onde | Valor |
-|---|---|---|
-| Service connection | Project settings → Service connections → Azure Resource Manager | nome `veti-azure-connection` |
-| Variable group | Pipelines → Library | nome `veti-secrets` com `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MAIL_USERNAME`, `MAIL_PASSWORD` marcados como secretos |
-| Web App | Portal do Azure | Linux, Java SE 21, nome `veti-app` (ou ajuste `webAppName` na pipeline) |
-| Environment | Pipelines → Environments | `veti-producao` (criado automaticamente no primeiro deploy) |
-
-O login com Google é opcional: configure `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` direto nas *Configurações do aplicativo* do Web App e cadastre a URL de redirect `https://<app>.azurewebsites.net/veti/login/oauth2/code/google` no Google Cloud.
+O deploy em produção é feito na EC2 (seção [Deploy na AWS](#deploy-na-aws-ec2-com-https)): `git pull` seguido de `docker compose ... up -d --build`. Os segredos de produção ficam só no `.env` da EC2, fora do repositório.

@@ -9,7 +9,7 @@ Roteiro para apresentar a arquitetura e as decisões técnicas. A demonstração
 3. **Swagger** em `/veti/swagger-ui.html`.
 4. **SQL Developer ou DBeaver** conectado ao Oracle, com `SELECT * FROM TB_AUDITORIA ORDER BY ID_AUDITORIA DESC;` pronto.
 5. **`/health`** numa aba.
-6. **Pipeline** do Azure DevOps (última execução verde) e o **e-mail** do tutor de exemplo no celular.
+6. **GitHub Actions** (última execução verde do CI), um terminal SSH na EC2 (`docker compose ps`) e o **e-mail** do tutor de exemplo no celular.
 
 ## Cronograma
 
@@ -21,7 +21,7 @@ Roteiro para apresentar a arquitetura e as decisões técnicas. A demonstração
 | 4:00 – 5:30 | Regras de negócio e validação | `ConsultaService`, conflito de agenda ao vivo |
 | 5:30 – 7:30 | Oracle e PL-SQL | `pkg_veti.sql`, `VetiPackageRepository`, tela Relatórios e `TB_AUDITORIA` |
 | 7:30 – 8:30 | Integração: e-mail | Notificar tutor e e-mail chegando |
-| 8:30 – 9:30 | Qualidade, observabilidade e deploy | Testes, `/health`, logs, pipeline |
+| 8:30 – 9:30 | Qualidade, observabilidade e deploy | Testes, `/health`, logs, GitHub Actions, EC2 |
 | 9:30 – 10:00 | Fechamento | Próximos passos |
 
 ## Roteiro com falas
@@ -35,7 +35,7 @@ Roteiro para apresentar a arquitetura e as decisões técnicas. A demonstração
 - Camadas **controller → service → repository**, com DTOs em `record` e **MapStruct** para converter entidade ↔ DTO.
 - Dois tipos de controller sobre os **mesmos services**: `controller/` (REST, JSON) e `controller/web/` (telas). Mostre `ConsultaController` e `ConsultaPainelController` chamando o mesmo `ConsultaService`.
 - **Injeção por construtor** (`@RequiredArgsConstructor`), **Spring Cache** (`@Cacheable`/`@CacheEvict`) nas listagens.
-- Infra: **Oracle 23ai** em container numa EC2 da AWS; aplicação como JAR no **Azure App Service**.
+- Infra na AWS: **Oracle 23ai**, aplicação e proxy HTTPS (**Caddy**) com **Docker Compose** na mesma EC2, e **CloudFront** para a URL personalizada.
 
 ### 2:30 – 4:00 · Segurança
 - **Spring Security stateless com JWT**: o mesmo token serve no header `Authorization` (API) e num cookie **HttpOnly SameSite=Lax** (`veti_token`, telas). Mostre `SecurityFilter` e `AuthCookies`.
@@ -68,7 +68,7 @@ Roteiro para apresentar a arquitetura e as decisões técnicas. A demonstração
 ### 8:30 – 9:30 · Qualidade, observabilidade e deploy
 - **37 testes unitários** (JUnit 5 + Mockito, padrão AAA) e **testes de API** (Postman/Newman) cobrindo login, permissões, procedures e trigger.
 - **Observabilidade**: `/health` com banco e Google (DEGRADED sem derrubar a instância), logs JSON com `traceId`/`correlationId`, tracing OpenTelemetry até o JDBC, métricas no Actuator.
-- **CI/CD no Azure DevOps**: a cada push na master, testes → JAR → API contra Oracle em container → Newman → artefato → deploy no Web App. Segredos em variable group protegido.
+- **CI no GitHub Actions**: a cada push na main, testes â JAR â API contra Oracle em container â Newman. **Deploy na AWS**: na EC2, `git pull` + `docker compose up -d --build`; segredos sÃ³ no `.env` da EC2.
 
 ### 9:30 – 10:00 · Fechamento
 - Recapitule: arquitetura em camadas, segurança JWT/OAuth2 por perfil, PL-SQL integrado à API, e-mail real, testes e pipeline.
@@ -82,11 +82,11 @@ Roteiro para apresentar a arquitetura e as decisões técnicas. A demonstração
 | Por que parte da regra no banco? | Requisito da disciplina de banco e regras que valem para qualquer cliente do banco (auditoria por trigger não depende da API) |
 | Como evitam conflito de horário com duas requisições ao mesmo tempo? | Além da checagem no service, há a constraint única `TB_CON_DT_VET_UN` (data + veterinário) no Oracle |
 | E se o Gmail cair? | O e-mail falha com mensagem clara (502 na API), o restante do sistema continua; o `/health` não depende do SMTP |
-| Por que Oracle na AWS e app na Azure? | Oracle exigido pela disciplina de banco, em container na nuvem (aceito por DevOps); o deploy da app precisa ser num Web App da Azure |
+| Por que tudo numa EC2? | Um Ãºnico `docker compose` sobe Oracle, app e HTTPS; simples de demonstrar e barato. Para escalar, o prÃ³ximo passo seria RDS para o banco e ECS para a app |
 | Como o front fica atualizado? | Thymeleaf renderiza no servidor; CSS e imagens versionados por hash do conteúdo, sem cache antigo |
 
 ## Plano B
 
-- **Sem internet ou Azure fora**: rode local com `docker compose up --build` (Oracle + app) e siga o mesmo roteiro.
+- **Sem internet ou EC2 fora**: rode local com `docker compose up --build` (Oracle + app) e siga o mesmo roteiro.
 - **E-mail não chega**: mostre a mensagem de sucesso na tela e o log `E-mail enviado para ...`; explique o modo simulado.
 - **Oracle lento na primeira subida**: suba tudo 5 minutos antes da apresentação.
