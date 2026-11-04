@@ -1,0 +1,7 @@
+# Proxy HTTPS da Veti na EC2. O Caddy emite e renova o certificado Let's Encrypt sozinho.
+# APP_DOMAIN vem do .env, ex.: 18-207-27-110.sslip.io (o IP elastico com hifens).
+{$APP_DOMAIN} {
+	encode gzip
+	redir / /veti/ 302
+	reverse_proxy app:8080
+}

@@ -1,0 +1,30 @@
+# Producao na EC2 (AWS): Oracle + app + Caddy (HTTPS) na mesma maquina.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d --build
+# A porta 1521 do Oracle continua publicada (vem do docker-compose.yml); o Security Group a libera so para o IP da equipe.
+services:
+  app:
+    restart: unless-stopped
+    # A app nao fica exposta: so o Caddy fala com ela pela rede interna do Docker
+    ports: !reset []
+    environment:
+      - LOG_FORMAT=logstash
+      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx768m
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy-data:
+  caddy-config:
