@@ -33,6 +33,14 @@ public class RelatorioService {
         return chamar("PRC_RESUMO_CONSULTAS", vetiPackageRepository::resumoConsultas);
     }
 
+    public String resumoReceitas() {
+        return chamar("PRC_RESUMO_RECEITAS", vetiPackageRepository::resumoReceitas);
+    }
+
+    public String exportarDataset() {
+        return chamar("PRC_EXPORTAR_DATASET", vetiPackageRepository::exportarDataset);
+    }
+
     public List<AuditoriaConsultaResponse> auditoriaConsultas() {
         return vetiPackageRepository.ultimasAuditorias(LIMITE_AUDITORIA);
     }

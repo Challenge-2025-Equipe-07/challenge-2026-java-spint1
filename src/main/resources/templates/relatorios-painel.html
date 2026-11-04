@@ -10,7 +10,10 @@
             <h1>Relatórios do banco</h1>
             <p>Gerados no Oracle pelo package <code>PKG_VETI</code> e pela trigger <code>TRG_AUDITORIA_CONSULTA</code>.</p>
         </div>
-        <a class="btn ghost" th:href="@{/relatorios/painel}">Atualizar</a>
+        <div>
+            <a class="btn ghost" th:href="@{/relatorios/dataset-json(download=true)}">Exportar dataset JSON</a>
+            <a class="btn ghost" th:href="@{/relatorios/painel}">Atualizar</a>
+        </div>
     </div>
 
     <div th:replace="~{fragments/layout :: mensagens}"></div>
@@ -19,6 +22,13 @@
         <h2>Consultas por veterinário e pet</h2>
         <p class="dica">Procedure <code>PKG_VETI.PRC_RESUMO_CONSULTAS</code>: contagem manual com subtotal por veterinário e total geral.</p>
         <pre class="relatorio" th:text="${resumo}"></pre>
+    </section>
+
+    <section class="card" style="margin-top: 20px">
+        <h2>Medicamentos por receita</h2>
+        <p class="dica">Procedure <code>PKG_VETI.PRC_RESUMO_RECEITAS</code>: soma manual das quantidades por receita e medicamento,
+            com subtotal por receita e total geral (sem ROLLUP, CUBE ou GROUPING SETS).</p>
+        <pre class="relatorio" th:text="${resumoReceitas}"></pre>
     </section>
 
     <section class="card" style="margin-top: 20px">

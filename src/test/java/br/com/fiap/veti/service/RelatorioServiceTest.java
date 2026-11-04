@@ -62,6 +62,31 @@ class RelatorioServiceTest {
     }
 
     @Test
+    void resumoReceitas_deveConverterQuantidadeInvalidaEmRegraDeNegocio() {
+        // Arrange
+        when(vetiPackageRepository.resumoReceitas()).thenThrow(erroOracle(20031,
+                "ORA-20031: PRC_RESUMO_RECEITAS: item de receita com quantidade invalida (menor que 1).\nORA-06512: at \"VETI.PKG_VETI\", line 420"));
+
+        // Act / Assert
+        assertThatThrownBy(() -> relatorioService.resumoReceitas())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("PRC_RESUMO_RECEITAS: item de receita com quantidade invalida (menor que 1).");
+    }
+
+    @Test
+    void exportarDataset_deveDevolverOJsonDaProcedure() {
+        // Arrange
+        String dataset = "{\"tutores\":[],\"veterinarios\":[],\"medicamentos\":[]}";
+        when(vetiPackageRepository.exportarDataset()).thenReturn(dataset);
+
+        // Act
+        String json = relatorioService.exportarDataset();
+
+        // Assert
+        assertThat(json).isEqualTo(dataset);
+    }
+
+    @Test
     void mensagemOracle_deveRemoverCodigoEPilhaDoOracle() {
         // Arrange
         String mensagem = "ORA-20002: FN_MONTA_JSON: quantidade de chaves e valores diferente.\nORA-06512: at line 1";

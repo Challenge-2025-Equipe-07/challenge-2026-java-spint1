@@ -116,8 +116,21 @@ erDiagram
 
 | Objeto | Tipo | Uso na aplicação |
 |---|---|---|
-| `FN_MONTA_JSON` | Função | Monta JSON manualmente (sem funções nativas de JSON); usada pela `PRC_CONSULTAS_JSON` |
+| `FN_MONTA_JSON` | Função | Monta JSON manualmente (sem funções nativas de JSON), com texto, número, booleano e JSON aninhado; usada pela `PRC_CONSULTAS_JSON` e pela `PRC_EXPORTAR_DATASET` |
 | `FN_VALIDA_SENHA` | Função | Chamada no cadastro de veterinário (`VeterinarioService.cadastrar`) |
 | `PRC_CONSULTAS_JSON` | Procedure | `GET /relatorios/consultas-json` e tela **Relatórios** |
 | `PRC_RESUMO_CONSULTAS` | Procedure | `GET /relatorios/resumo-consultas` e tela **Relatórios** |
-| `TRG_AUDITORIA_CONSULTA` | Trigger | Grava `TB_AUDITORIA`; exibida em `GET /relatorios/auditoria-consultas` |
+| `PRC_RESUMO_RECEITAS` | Procedure | Soma manual de `QT_MEDICAMENTO` por receita e medicamento, com subtotal e total geral; `GET /relatorios/resumo-receitas` e tela **Relatórios** |
+| `PRC_EXPORTAR_DATASET` | Procedure | Exporta o banco em JSON aninhado para o MongoDB; `GET /relatorios/dataset-json` e botão **Exportar dataset JSON** |
+| `PRC_REGISTRAR_AUDITORIA` | Procedure | Grava `TB_AUDITORIA`; chamada pela trigger |
+| `TRG_AUDITORIA_CONSULTA` | Trigger | Coleta `:OLD`/`:NEW` de `TB_CONSULTA` e delega a gravação ao package; exibida em `GET /relatorios/auditoria-consultas` |
+
+## Modelo de documentos (MongoDB)
+
+O JSON gerado pela `PRC_EXPORTAR_DATASET` é importado no banco `veti` do MongoDB ([db/mongodb](../db/mongodb)):
+
+| Coleção | Origem no Oracle | Estrutura |
+|---|---|---|
+| `tutores` | `TB_TUTOR` e tudo que depende dele | `_id` = `ID_TUTOR`; embute `pets[]` → `consultas[]` (com `veterinario {id, email}`) → `exames[]` e `receitas[]` → `medicamentos[]` |
+| `veterinarios` | `TB_VETERINARIO` | `_id`, `email`, `perfil` (a senha não é exportada) |
+| `medicamentos` | `TB_MEDICAMENTO` | `_id`, `nome`, `descricao` (catálogo, usado com `$lookup`) |

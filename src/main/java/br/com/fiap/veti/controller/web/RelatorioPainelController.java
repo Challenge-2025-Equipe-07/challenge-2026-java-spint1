@@ -24,6 +24,7 @@ public class RelatorioPainelController {
             // uma consulta por linha para facilitar a leitura na tela
             model.addAttribute("consultasJson", relatorioService.consultasJson().replace("},{", "},\n{"));
             model.addAttribute("resumo", relatorioService.resumoConsultas());
+            model.addAttribute("resumoReceitas", relatorioService.resumoReceitas());
         } catch (IllegalArgumentException e) {
             model.addAttribute("erro", e.getMessage());
         }

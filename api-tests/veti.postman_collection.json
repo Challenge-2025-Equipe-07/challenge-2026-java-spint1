@@ -237,6 +237,34 @@
       ] } }]
     },
     {
+      "name": "09b2 - Procedure PKG_VETI.PRC_EXPORTAR_DATASET aninha a consulta no tutor",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/relatorios/dataset-json"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "const dataset = pm.response.json();",
+        "const tutor = dataset.tutores.find(t => t.id === Number(pm.collectionVariables.get('tutorId')));",
+        "pm.test('tutor criado está no dataset', () => pm.expect(tutor).to.exist);",
+        "const pet = tutor.pets.find(p => p.id === Number(pm.collectionVariables.get('petId')));",
+        "pm.test('pet embutido no tutor', () => pm.expect(pet).to.exist);",
+        "pm.test('consulta embutida no pet', () => pm.expect(pet.consultas.map(c => c.id)).to.include(Number(pm.collectionVariables.get('consultaId'))));",
+        "pm.test('senha dos veterinários não é exportada', () => pm.expect(JSON.stringify(dataset.veterinarios)).to.not.include('password'));"
+      ] } }]
+    },
+    {
+      "name": "09b3 - Procedure PKG_VETI.PRC_RESUMO_RECEITAS devolve o total geral",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/relatorios/resumo-receitas"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "pm.test('relatório com total geral ou aviso de tabela vazia', () => pm.expect(pm.response.text()).to.match(/Total Geral|AVISO/));"
+      ] } }]
+    },
+    {
       "name": "09c - Trigger TRG_AUDITORIA_CONSULTA registrou o INSERT",
       "request": {
         "method": "GET",

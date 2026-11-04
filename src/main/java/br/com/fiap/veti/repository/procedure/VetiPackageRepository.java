@@ -33,6 +33,8 @@ public class VetiPackageRepository {
     private final SimpleJdbcCall validaSenha;
     private final SimpleJdbcCall consultasJson;
     private final SimpleJdbcCall resumoConsultas;
+    private final SimpleJdbcCall resumoReceitas;
+    private final SimpleJdbcCall exportarDataset;
 
     public VetiPackageRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -53,6 +55,16 @@ public class VetiPackageRepository {
                 .withProcedureName("PRC_RESUMO_CONSULTAS")
                 .withoutProcedureColumnMetaDataAccess()
                 .declareParameters(new SqlOutParameter("P_RESUMO", Types.CLOB, null, CLOB_PARA_TEXTO));
+        this.resumoReceitas = new SimpleJdbcCall(jdbcTemplate)
+                .withCatalogName(PACKAGE)
+                .withProcedureName("PRC_RESUMO_RECEITAS")
+                .withoutProcedureColumnMetaDataAccess()
+                .declareParameters(new SqlOutParameter("P_RESUMO", Types.CLOB, null, CLOB_PARA_TEXTO));
+        this.exportarDataset = new SimpleJdbcCall(jdbcTemplate)
+                .withCatalogName(PACKAGE)
+                .withProcedureName("PRC_EXPORTAR_DATASET")
+                .withoutProcedureColumnMetaDataAccess()
+                .declareParameters(new SqlOutParameter("P_JSON", Types.CLOB, null, CLOB_PARA_TEXTO));
     }
 
     /** PKG_VETI.FN_VALIDA_SENHA: devolve 'SENHA_VALIDA' ou 'ERRO: motivo'. */
@@ -68,6 +80,16 @@ public class VetiPackageRepository {
     /** PKG_VETI.PRC_RESUMO_CONSULTAS: relatório com subtotal por veterinário e total geral. */
     public String resumoConsultas() {
         return (String) saida(resumoConsultas.execute(), "P_RESUMO");
+    }
+
+    /** PKG_VETI.PRC_RESUMO_RECEITAS: soma das quantidades por receita e medicamento, com subtotal e total geral. */
+    public String resumoReceitas() {
+        return (String) saida(resumoReceitas.execute(), "P_RESUMO");
+    }
+
+    /** PKG_VETI.PRC_EXPORTAR_DATASET: banco relacional exportado em JSON aninhado, para importação no MongoDB. */
+    public String exportarDataset() {
+        return (String) saida(exportarDataset.execute(), "P_JSON");
     }
 
     /** Últimos registros gravados pela trigger TRG_AUDITORIA_CONSULTA. */

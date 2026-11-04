@@ -126,7 +126,7 @@ Produção na AWS (uma EC2, Docker Compose):
 |---|---|---|
 | DevOps Tools & Cloud Computing | CI no GitHub Actions e deploy na AWS: EC2 com Docker Compose (Oracle + app + Caddy HTTPS) e CloudFront para a URL personalizada | [ci.yml](.github/workflows/ci.yml), [docker-compose.aws.yml](docker-compose.aws.yml), [Caddyfile](Caddyfile), [Dockerfile](Dockerfile) |
 | Compliance, QA & Tests | Testes unitários (JUnit/Mockito, AAA) e de API (Newman) rodando no CI | [src/test](src/test), [api-tests](api-tests) |
-| Mastering Relational and Non-Relational Database | A API usa o Oracle como banco principal e chama o package `PKG_VETI` (funções `FN_MONTA_JSON` e `FN_VALIDA_SENHA`, procedures `PRC_CONSULTAS_JSON` e `PRC_RESUMO_CONSULTAS`); a trigger `TRG_AUDITORIA_CONSULTA` audita as consultas | [MER/DER](docs/der.md), [DDL](docs/ddl-oracle.sql), [pkg_veti.sql](src/main/resources/db/pkg_veti.sql), [VetiPackageRepository](src/main/java/br/com/fiap/veti/repository/procedure/VetiPackageRepository.java) |
+| Mastering Relational and Non-Relational Database | A API usa o Oracle como banco principal e chama o package `PKG_VETI`: as funções `FN_MONTA_JSON` e `FN_VALIDA_SENHA` e as procedures `PRC_CONSULTAS_JSON`, `PRC_RESUMO_CONSULTAS`, `PRC_RESUMO_RECEITAS` e `PRC_EXPORTAR_DATASET`. A trigger `TRG_AUDITORIA_CONSULTA` audita as consultas. O dataset exportado em JSON é importado no MongoDB | [entrega de BD](db/README.md), [MER/DER](docs/der.md), [DDL](docs/ddl-oracle.sql), [pkg_veti.sql](src/main/resources/db/pkg_veti.sql), [VetiPackageRepository](src/main/java/br/com/fiap/veti/repository/procedure/VetiPackageRepository.java), [MongoDB](db/mongodb) |
 
 ## Como executar localmente
 
@@ -215,7 +215,8 @@ O header `X-Forwarded-Host` faz a aplicação montar os redirects (login, logout
 
 - **MER/DER**: [docs/der.md](docs/der.md) (diagrama Mermaid, renderizado pelo GitHub).
 - **Modelo físico**: [docs/ddl-oracle.sql](docs/ddl-oracle.sql), gerado pelo próprio Hibernate com o dialeto do Oracle.
-- **PL-SQL**: [src/main/resources/db/pkg_veti.sql](src/main/resources/db/pkg_veti.sql). É idempotente e pode ser rodado também à mão no SQL Developer (F5). O arquivo [db/2TDSPW_2026_CodigoSql_CLYVOVET.sql](db/2TDSPW_2026_CodigoSql_CLYVOVET.sql) é a versão da Sprint 3, feita sobre o schema anterior.
+- **PL-SQL**: [src/main/resources/db/pkg_veti.sql](src/main/resources/db/pkg_veti.sql). É idempotente e pode ser rodado também à mão no SQL Developer (F5).
+- **Entrega da disciplina de Banco de Dados** (script único com tabelas, carga, package, trigger e testes, mais os scripts do MongoDB): [db/README.md](db/README.md).
 
 Para regenerar o DDL depois de mudar uma entidade, suba a aplicação uma vez com:
 
@@ -264,7 +265,7 @@ Documentação completa no Swagger (`/veti/swagger-ui.html`). Resumo:
 | Pets | `GET/POST /pets`, `GET/PUT/DELETE /pets/{id}` |
 | Consultas | `GET/POST /consultas`, `GET/PUT/DELETE /consultas/{id}`, `POST /consultas/{id}/notificar-tutor` |
 | Veterinários | `GET /veterinarios`, `GET/DELETE /veterinarios/{id}` (ADMIN) |
-| Relatórios do banco | `GET /relatorios/consultas-json`, `GET /relatorios/resumo-consultas`, `GET /relatorios/auditoria-consultas` (ADMIN) |
+| Relatórios do banco | `GET /relatorios/consultas-json`, `GET /relatorios/resumo-consultas`, `GET /relatorios/resumo-receitas`, `GET /relatorios/dataset-json[?download=true]`, `GET /relatorios/auditoria-consultas` (ADMIN) |
 
 Use o header `Authorization: Bearer <token>` nas chamadas.
 

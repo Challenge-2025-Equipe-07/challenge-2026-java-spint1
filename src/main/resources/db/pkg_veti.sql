@@ -5,15 +5,21 @@
 --
 -- Conteudo:
 --   1. TB_AUDITORIA (criada aqui porque nao e uma entidade JPA)
---   2. Package PKG_VETI: FN_MONTA_JSON, FN_VALIDA_SENHA, PRC_CONSULTAS_JSON, PRC_RESUMO_CONSULTAS
---   3. Trigger TRG_AUDITORIA_CONSULTA (DML em TB_CONSULTA)
+--   2. Package PKG_VETI
+--        Funcoes:    FN_MONTA_JSON, FN_VALIDA_SENHA
+--        Procedures: PRC_CONSULTAS_JSON, PRC_RESUMO_CONSULTAS, PRC_RESUMO_RECEITAS,
+--                    PRC_EXPORTAR_DATASET, PRC_REGISTRAR_AUDITORIA
+--   3. Trigger TRG_AUDITORIA_CONSULTA (DML em TB_CONSULTA, grava pelo PKG_VETI)
 --   4. Verificacao: falha se algum objeto ficar INVALID
 --
 -- Execucao:
 --   - Automatica: a API roda este arquivo na subida (spring.sql.init), depois de o Hibernate criar as tabelas.
 --   - Manual (SQL Developer ou DBeaver): rodar como script (F5) com o usuario da aplicacao.
 -- O script e idempotente: pode ser executado varias vezes.
--- Cada bloco termina com uma linha contendo apenas a barra; nao use a barra em outro lugar do arquivo.
+-- Regras do leitor de script do Spring (separador "barra"):
+--   - cada bloco termina com uma linha contendo apenas a barra; nao use a barra fora de textos entre aspas;
+--   - nao use a barra invertida: ela e trocada por CHR(92).
+-- O DBMS_OUTPUT so aparece no SQL Developer; para a API o resultado volta nos parametros OUT CLOB.
 --------------------------------------------------------------------------------
 
 -- BLOCO 1: TABELA DE AUDITORIA (alimentada pela trigger do Bloco 3)
@@ -29,7 +35,8 @@ BEGIN
             DT_OPERACAO           TIMESTAMP      NOT NULL,
             DS_VALORES_ANTERIORES VARCHAR2(4000),
             DS_VALORES_NOVOS      VARCHAR2(4000),
-            CONSTRAINT TB_AUDITORIA_PK PRIMARY KEY (ID_AUDITORIA)
+            CONSTRAINT TB_AUDITORIA_PK PRIMARY KEY (ID_AUDITORIA),
+            CONSTRAINT TB_AUDITORIA_TP_OPERACAO_CK CHECK (TP_OPERACAO IN (''INSERT'', ''UPDATE'', ''DELETE''))
         )';
 EXCEPTION
     WHEN e_ja_existe THEN
@@ -41,10 +48,11 @@ END;
 CREATE OR REPLACE PACKAGE PKG_VETI AS
 
     -- lista generica de strings (chaves, valores e tipos da FN_MONTA_JSON)
-    TYPE t_lista IS TABLE OF VARCHAR2(4000);
+    TYPE t_lista IS TABLE OF VARCHAR2(32767);
 
     -- Monta manualmente um objeto JSON, sem TO_JSON, JSON_OBJECT ou qualquer funcao nativa de JSON.
-    -- p_tipos: 'N' = valor numerico (sem aspas), 'S' = texto (com aspas, padrao)
+    -- p_tipos: 'S' = texto (padrao) | 'N' = numero | 'B' = booleano (1, 0, TRUE ou FALSE)
+    --          'J' = objeto ou array JSON ja montado (inserido sem aspas, para aninhar documentos)
     FUNCTION fn_monta_json(
         p_chaves  IN t_lista,
         p_valores IN t_lista,
@@ -62,11 +70,63 @@ CREATE OR REPLACE PACKAGE PKG_VETI AS
     -- e pet (categoria 2), com subtotal por veterinario e total geral. Devolve o relatorio em texto.
     PROCEDURE prc_resumo_consultas(p_resumo OUT CLOB);
 
+    -- Soma manual (sem ROLLUP, CUBE, GROUPING SETS ou GROUPING) de QT_MEDICAMENTO da tabela de fatos
+    -- TB_RECEITA_MEDICAMENTO por receita (categoria 1) e medicamento (categoria 2), com subtotal por
+    -- receita e total geral. Devolve o relatorio em texto.
+    PROCEDURE prc_resumo_receitas(p_resumo OUT CLOB);
+
+    -- Exporta o banco relacional em um documento JSON aninhado para importacao no MongoDB:
+    -- tutores -> pets -> consultas (veterinario, exames e receitas, com seus medicamentos),
+    -- mais os catalogos de veterinarios (sem senha) e de medicamentos.
+    PROCEDURE prc_exportar_dataset(p_json OUT CLOB);
+
+    -- Grava um registro em TB_AUDITORIA (chamada pela trigger TRG_AUDITORIA_CONSULTA).
+    PROCEDURE prc_registrar_auditoria(
+        p_tipo_operacao      IN VARCHAR2,
+        p_valores_anteriores IN VARCHAR2,
+        p_valores_novos      IN VARCHAR2
+    );
+
 END PKG_VETI;
 /
 
 -- BLOCO 2: PACKAGE PKG_VETI (corpo)
 CREATE OR REPLACE PACKAGE BODY PKG_VETI AS
+
+    -- (privada) escapa barra invertida, aspas duplas e quebras de linha de um texto JSON.
+    -- CHR(92) e a barra invertida; o leitor de script do Spring a trataria como escape.
+    FUNCTION fn_escapa(p_texto IN VARCHAR2) RETURN VARCHAR2
+    IS
+    BEGIN
+        RETURN REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p_texto,
+                   CHR(92), CHR(92) || CHR(92)),
+                   '"',     CHR(92) || '"'),
+                   CHR(10), CHR(92) || 'n'),
+                   CHR(13), CHR(92) || 'r'),
+                   CHR(9),  CHR(92) || 't');
+    END fn_escapa;
+
+    -- (privada) imprime um CLOB no DBMS_OUTPUT, uma linha por quebra CHR(10)
+    PROCEDURE prc_imprime(p_texto IN CLOB)
+    IS
+        v_inicio  PLS_INTEGER := 1;
+        v_fim     PLS_INTEGER;
+        v_tamanho PLS_INTEGER;
+    BEGIN
+        IF p_texto IS NULL THEN
+            RETURN;
+        END IF;
+        v_tamanho := DBMS_LOB.GETLENGTH(p_texto);
+        WHILE v_inicio <= v_tamanho LOOP
+            v_fim := DBMS_LOB.INSTR(p_texto, CHR(10), v_inicio);
+            IF v_fim = 0 THEN
+                v_fim := v_tamanho + 1;
+            END IF;
+            DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(p_texto, v_fim - v_inicio, v_inicio));
+            v_inicio := v_fim + 1;
+        END LOOP;
+    END prc_imprime;
+
 
     FUNCTION fn_monta_json(
         p_chaves  IN t_lista,
@@ -74,12 +134,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_VETI AS
         p_tipos   IN t_lista DEFAULT NULL
     ) RETURN VARCHAR2
     IS
-        v_json           VARCHAR2(32000) := '{';
-        v_valor_escapado VARCHAR2(4000);
-        v_tipo           VARCHAR2(1);
+        v_json  VARCHAR2(32767) := '{';
+        v_valor VARCHAR2(32767);
+        v_tipo  VARCHAR2(10);
         e_listas_vazias       EXCEPTION;
         e_tamanhos_diferentes EXCEPTION;
         e_tipo_invalido       EXCEPTION;
+        e_json_aninhado       EXCEPTION;
     BEGIN
         -- Excecao 1: listas vazias ou nulas
         IF p_chaves IS NULL OR p_valores IS NULL OR p_chaves.COUNT = 0 THEN
@@ -93,28 +154,46 @@ CREATE OR REPLACE PACKAGE BODY PKG_VETI AS
 
         FOR i IN 1 .. p_chaves.COUNT LOOP
             IF p_tipos IS NOT NULL AND p_tipos.COUNT = p_chaves.COUNT THEN
-                v_tipo := p_tipos(i);
+                v_tipo := UPPER(p_tipos(i));
             ELSE
                 v_tipo := 'S';
             END IF;
 
-            IF v_tipo NOT IN ('S', 'N') THEN
+            -- Excecao 3: tipo fora do dominio aceito
+            IF v_tipo IS NULL OR v_tipo NOT IN ('S', 'N', 'B', 'J') THEN
                 RAISE e_tipo_invalido;
             END IF;
 
-            IF p_valores(i) IS NULL THEN
-                v_json := v_json || '"' || p_chaves(i) || '":null';
+            v_valor := p_valores(i);
+
+            IF v_valor IS NULL THEN
+                v_valor := 'null';
             ELSIF v_tipo = 'N' THEN
-                -- Excecao 3 (VALUE_ERROR nativa): o valor precisa ser numerico
-                v_json := v_json || '"' || p_chaves(i) || '":'
-                          || TO_CHAR(TO_NUMBER(p_valores(i)), 'TM9', 'NLS_NUMERIC_CHARACTERS=''.,''');
+                -- Excecao 4 (VALUE_ERROR nativa): o valor precisa ser numerico; a saida usa ponto decimal
+                v_valor := TO_CHAR(TO_NUMBER(v_valor), 'TM9', 'NLS_NUMERIC_CHARACTERS=''.,''');
+                IF SUBSTR(v_valor, 1, 1) = '.' THEN
+                    v_valor := '0' || v_valor;
+                ELSIF SUBSTR(v_valor, 1, 2) = '-.' THEN
+                    v_valor := '-0' || SUBSTR(v_valor, 2);
+                END IF;
+            ELSIF v_tipo = 'B' THEN
+                IF UPPER(v_valor) IN ('1', 'TRUE') THEN
+                    v_valor := 'true';
+                ELSIF UPPER(v_valor) IN ('0', 'FALSE') THEN
+                    v_valor := 'false';
+                ELSE
+                    RAISE VALUE_ERROR;
+                END IF;
+            ELSIF v_tipo = 'J' THEN
+                -- Excecao 5: o valor aninhado precisa ser um objeto ou um array JSON
+                IF SUBSTR(LTRIM(v_valor), 1, 1) NOT IN ('{', '[') THEN
+                    RAISE e_json_aninhado;
+                END IF;
             ELSE
-                -- escapa barra invertida e aspas duplas manualmente
-                -- (CHR(92) e a barra invertida; o leitor de script do Spring a trataria como escape)
-                v_valor_escapado := REPLACE(REPLACE(p_valores(i), CHR(92), CHR(92) || CHR(92)),
-                                            '"', CHR(92) || '"');
-                v_json := v_json || '"' || p_chaves(i) || '":"' || v_valor_escapado || '"';
+                v_valor := '"' || fn_escapa(v_valor) || '"';
             END IF;
+
+            v_json := v_json || '"' || fn_escapa(p_chaves(i)) || '":' || v_valor;
 
             IF i < p_chaves.COUNT THEN
                 v_json := v_json || ',';
@@ -129,9 +208,11 @@ CREATE OR REPLACE PACKAGE BODY PKG_VETI AS
         WHEN e_tamanhos_diferentes THEN
             RAISE_APPLICATION_ERROR(-20002, 'FN_MONTA_JSON: quantidade de chaves e valores diferente.');
         WHEN e_tipo_invalido THEN
-            RAISE_APPLICATION_ERROR(-20003, 'FN_MONTA_JSON: tipo de campo invalido (use apenas S ou N).');
+            RAISE_APPLICATION_ERROR(-20003, 'FN_MONTA_JSON: tipo de campo invalido (use S, N, B ou J).');
         WHEN VALUE_ERROR THEN
-            RAISE_APPLICATION_ERROR(-20004, 'FN_MONTA_JSON: valor informado como numerico nao e um numero valido.');
+            RAISE_APPLICATION_ERROR(-20004, 'FN_MONTA_JSON: valor incompativel com o tipo informado ou JSON acima do tamanho maximo.');
+        WHEN e_json_aninhado THEN
+            RAISE_APPLICATION_ERROR(-20005, 'FN_MONTA_JSON: valor do tipo J deve ser um objeto ou array JSON.');
         WHEN OTHERS THEN
             RAISE_APPLICATION_ERROR(-20099, 'FN_MONTA_JSON: erro inesperado - ' || SQLERRM);
     END fn_monta_json;
@@ -318,10 +399,344 @@ CREATE OR REPLACE PACKAGE BODY PKG_VETI AS
             RAISE_APPLICATION_ERROR(-20029, 'PRC_RESUMO_CONSULTAS: erro inesperado - ' || SQLERRM);
     END prc_resumo_consultas;
 
+
+    PROCEDURE prc_resumo_receitas(p_resumo OUT CLOB)
+    IS
+        CURSOR c_itens IS
+            SELECT rm.TB_RECEITA_ID_RECEITA         AS ID_RECEITA,
+                   rm.TB_MEDICAMENTO_ID_MEDICAMENTO AS ID_MEDICAMENTO,
+                   m.NM_MEDICAMENTO,
+                   rm.QT_MEDICAMENTO
+            FROM   TB_RECEITA_MEDICAMENTO rm
+            JOIN   TB_MEDICAMENTO m ON m.ID_MEDICAMENTO = rm.TB_MEDICAMENTO_ID_MEDICAMENTO
+            ORDER BY rm.TB_RECEITA_ID_RECEITA, rm.TB_MEDICAMENTO_ID_MEDICAMENTO;
+
+        v_receita_atual     TB_RECEITA_MEDICAMENTO.TB_RECEITA_ID_RECEITA%TYPE := NULL;
+        v_medicamento_atual TB_RECEITA_MEDICAMENTO.TB_MEDICAMENTO_ID_MEDICAMENTO%TYPE := NULL;
+        v_nome_atual        TB_MEDICAMENTO.NM_MEDICAMENTO%TYPE := NULL;
+        v_qtd_combinacao    NUMBER := 0;
+        v_subtotal          NUMBER := 0;
+        v_total_geral       NUMBER := 0;
+        v_qtd_linhas        NUMBER := 0;
+        e_quantidade_invalida EXCEPTION;
+
+        PROCEDURE escreve(p_texto IN VARCHAR2) IS
+        BEGIN
+            p_resumo := p_resumo || p_texto || CHR(10);
+            DBMS_OUTPUT.PUT_LINE(p_texto);
+        END escreve;
+
+        -- linha de detalhe: soma da combinacao completa (receita, medicamento)
+        PROCEDURE fecha_combinacao IS
+        BEGIN
+            IF v_medicamento_atual IS NOT NULL THEN
+                escreve(RPAD(TO_CHAR(v_receita_atual), 12)
+                        || RPAD(SUBSTR(v_medicamento_atual || ' - ' || v_nome_atual, 1, 38), 40)
+                        || TO_CHAR(v_qtd_combinacao));
+            END IF;
+        END fecha_combinacao;
+
+        -- subtotal da receita: categorias ausentes, rotulo na coluna do medicamento
+        PROCEDURE fecha_receita IS
+        BEGIN
+            IF v_receita_atual IS NOT NULL THEN
+                escreve(RPAD(' ', 12) || RPAD('Sub Total', 40) || TO_CHAR(v_subtotal));
+            END IF;
+        END fecha_receita;
+    BEGIN
+        p_resumo := '';
+        escreve(RPAD('Receita', 12) || RPAD('Medicamento', 40) || 'Quantidade');
+        escreve(RPAD('-', 10, '-') || '  ' || RPAD('-', 38, '-') || '  ' || RPAD('-', 10, '-'));
+
+        FOR r IN c_itens LOOP
+            -- Excecao 1 (regra de negocio): quantidade nula ou menor que 1
+            IF r.QT_MEDICAMENTO IS NULL OR r.QT_MEDICAMENTO < 1 THEN
+                RAISE e_quantidade_invalida;
+            END IF;
+
+            -- quebra de controle 1: mudou a receita, fecha a combinacao e o subtotal anteriores
+            IF v_receita_atual IS NOT NULL AND r.ID_RECEITA <> v_receita_atual THEN
+                fecha_combinacao;
+                fecha_receita;
+                v_subtotal          := 0;
+                v_medicamento_atual := NULL;
+                v_qtd_combinacao    := 0;
+            -- quebra de controle 2: mesma receita, mudou o medicamento
+            ELSIF v_medicamento_atual IS NOT NULL AND r.ID_MEDICAMENTO <> v_medicamento_atual THEN
+                fecha_combinacao;
+                v_qtd_combinacao := 0;
+            END IF;
+
+            v_receita_atual     := r.ID_RECEITA;
+            v_medicamento_atual := r.ID_MEDICAMENTO;
+            v_nome_atual        := r.NM_MEDICAMENTO;
+            v_qtd_combinacao    := v_qtd_combinacao + r.QT_MEDICAMENTO;
+            v_subtotal          := v_subtotal + r.QT_MEDICAMENTO;
+            v_total_geral       := v_total_geral + r.QT_MEDICAMENTO;
+            v_qtd_linhas        := v_qtd_linhas + 1;
+        END LOOP;
+
+        -- Excecao 2: nenhum item de receita para somar
+        IF v_qtd_linhas = 0 THEN
+            RAISE NO_DATA_FOUND;
+        END IF;
+
+        fecha_combinacao;
+        fecha_receita;
+        escreve(RPAD(' ', 12) || RPAD('Total Geral', 40) || TO_CHAR(v_total_geral));
+
+    EXCEPTION
+        WHEN e_quantidade_invalida THEN
+            RAISE_APPLICATION_ERROR(-20031, 'PRC_RESUMO_RECEITAS: item de receita com quantidade invalida (menor que 1).');
+        WHEN NO_DATA_FOUND THEN
+            escreve('AVISO: nao ha medicamentos em receitas para resumir.');
+        -- Excecao 3: erro de conversao ou aritmetico
+        WHEN VALUE_ERROR THEN
+            RAISE_APPLICATION_ERROR(-20032, 'PRC_RESUMO_RECEITAS: valor invalido ao somar as quantidades.');
+        WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20039, 'PRC_RESUMO_RECEITAS: erro inesperado - ' || SQLERRM);
+    END prc_resumo_receitas;
+
+
+    -- (privadas) montagem dos documentos aninhados do dataset
+    FUNCTION fn_json_itens_exame(p_exame_id IN NUMBER) RETURN VARCHAR2
+    IS
+        v_array VARCHAR2(32767) := '[';
+    BEGIN
+        FOR i IN (SELECT em.TB_MEDICAMENTO_ID_MEDICAMENTO AS ID_MEDICAMENTO, m.NM_MEDICAMENTO,
+                         em.QT_MEDICAMENTO, em.DS_POSOLOGIA
+                  FROM   TB_EXAME_MEDICAMENTO em
+                  JOIN   TB_MEDICAMENTO m ON m.ID_MEDICAMENTO = em.TB_MEDICAMENTO_ID_MEDICAMENTO
+                  WHERE  em.TB_EXAME_ID_EXAME = p_exame_id
+                  ORDER BY em.ID_PEDIDO) LOOP
+            IF v_array <> '[' THEN
+                v_array := v_array || ',';
+            END IF;
+            v_array := v_array || fn_monta_json(
+                t_lista('medicamento_id', 'nome', 'quantidade', 'posologia'),
+                t_lista(TO_CHAR(i.ID_MEDICAMENTO), i.NM_MEDICAMENTO, TO_CHAR(i.QT_MEDICAMENTO), i.DS_POSOLOGIA),
+                t_lista('N', 'S', 'N', 'S'));
+        END LOOP;
+        RETURN v_array || ']';
+    END fn_json_itens_exame;
+
+    FUNCTION fn_json_itens_receita(p_receita_id IN NUMBER) RETURN VARCHAR2
+    IS
+        v_array VARCHAR2(32767) := '[';
+    BEGIN
+        FOR i IN (SELECT rm.TB_MEDICAMENTO_ID_MEDICAMENTO AS ID_MEDICAMENTO, m.NM_MEDICAMENTO,
+                         rm.QT_MEDICAMENTO, rm.DS_POSOLOGIA
+                  FROM   TB_RECEITA_MEDICAMENTO rm
+                  JOIN   TB_MEDICAMENTO m ON m.ID_MEDICAMENTO = rm.TB_MEDICAMENTO_ID_MEDICAMENTO
+                  WHERE  rm.TB_RECEITA_ID_RECEITA = p_receita_id
+                  ORDER BY rm.ID_PEDIDO) LOOP
+            IF v_array <> '[' THEN
+                v_array := v_array || ',';
+            END IF;
+            v_array := v_array || fn_monta_json(
+                t_lista('medicamento_id', 'nome', 'quantidade', 'posologia'),
+                t_lista(TO_CHAR(i.ID_MEDICAMENTO), i.NM_MEDICAMENTO, TO_CHAR(i.QT_MEDICAMENTO), i.DS_POSOLOGIA),
+                t_lista('N', 'S', 'N', 'S'));
+        END LOOP;
+        RETURN v_array || ']';
+    END fn_json_itens_receita;
+
+    FUNCTION fn_json_exames(p_consulta_id IN NUMBER) RETURN VARCHAR2
+    IS
+        v_array VARCHAR2(32767) := '[';
+    BEGIN
+        FOR e IN (SELECT ID_EXAME, DS_EXAME, DS_URL
+                  FROM   TB_EXAME
+                  WHERE  TB_CONSULTA_ID_CONSULTA = p_consulta_id
+                  ORDER BY ID_EXAME) LOOP
+            IF v_array <> '[' THEN
+                v_array := v_array || ',';
+            END IF;
+            v_array := v_array || fn_monta_json(
+                t_lista('id', 'descricao', 'url', 'medicamentos'),
+                t_lista(TO_CHAR(e.ID_EXAME), e.DS_EXAME, e.DS_URL, fn_json_itens_exame(e.ID_EXAME)),
+                t_lista('N', 'S', 'S', 'J'));
+        END LOOP;
+        RETURN v_array || ']';
+    END fn_json_exames;
+
+    FUNCTION fn_json_receitas(p_consulta_id IN NUMBER) RETURN VARCHAR2
+    IS
+        v_array VARCHAR2(32767) := '[';
+    BEGIN
+        FOR r IN (SELECT ID_RECEITA, DS_RECEITA
+                  FROM   TB_RECEITA
+                  WHERE  TB_CONSULTA_ID_CONSULTA = p_consulta_id
+                  ORDER BY ID_RECEITA) LOOP
+            IF v_array <> '[' THEN
+                v_array := v_array || ',';
+            END IF;
+            v_array := v_array || fn_monta_json(
+                t_lista('id', 'descricao', 'medicamentos'),
+                t_lista(TO_CHAR(r.ID_RECEITA), r.DS_RECEITA, fn_json_itens_receita(r.ID_RECEITA)),
+                t_lista('N', 'S', 'J'));
+        END LOOP;
+        RETURN v_array || ']';
+    END fn_json_receitas;
+
+    FUNCTION fn_json_consultas(p_pet_id IN NUMBER) RETURN VARCHAR2
+    IS
+        v_array VARCHAR2(32767) := '[';
+    BEGIN
+        FOR c IN (SELECT c.ID_CONSULTA,
+                         TO_CHAR(c.DT_CONSULTA, 'YYYY-MM-DD"T"HH24:MI:SS') AS DT_CONSULTA,
+                         v.ID_VETERINARIO, v.DS_EMAIL AS VET_EMAIL
+                  FROM   TB_CONSULTA c
+                  JOIN   TB_VETERINARIO v ON v.ID_VETERINARIO = c.TB_VETERINARIO_ID_VETERINARIO
+                  WHERE  c.TB_PET_ID_PET = p_pet_id
+                  ORDER BY c.DT_CONSULTA) LOOP
+            IF v_array <> '[' THEN
+                v_array := v_array || ',';
+            END IF;
+            v_array := v_array || fn_monta_json(
+                t_lista('id', 'data_consulta', 'veterinario', 'exames', 'receitas'),
+                t_lista(TO_CHAR(c.ID_CONSULTA), c.DT_CONSULTA,
+                        fn_monta_json(t_lista('id', 'email'),
+                                      t_lista(TO_CHAR(c.ID_VETERINARIO), c.VET_EMAIL),
+                                      t_lista('N', 'S')),
+                        fn_json_exames(c.ID_CONSULTA),
+                        fn_json_receitas(c.ID_CONSULTA)),
+                t_lista('N', 'S', 'J', 'J', 'J'));
+        END LOOP;
+        RETURN v_array || ']';
+    END fn_json_consultas;
+
+    FUNCTION fn_json_pets(p_tutor_id IN NUMBER) RETURN VARCHAR2
+    IS
+        v_array VARCHAR2(32767) := '[';
+    BEGIN
+        -- TO_CHAR do FL_CASTRADO: TRUE ou FALSE no Oracle 23ai (BOOLEAN), 1 ou 0 no 19c (NUMBER)
+        FOR p IN (SELECT ID_PET, NM_PET, DS_RACA, DS_PESO, DS_IDADE, TO_CHAR(FL_CASTRADO) AS FL_CASTRADO
+                  FROM   TB_PET
+                  WHERE  TB_TUTOR_ID_TUTOR = p_tutor_id
+                  ORDER BY ID_PET) LOOP
+            IF v_array <> '[' THEN
+                v_array := v_array || ',';
+            END IF;
+            v_array := v_array || fn_monta_json(
+                t_lista('id', 'nome', 'raca', 'peso', 'idade', 'castrado', 'consultas'),
+                t_lista(TO_CHAR(p.ID_PET), p.NM_PET, p.DS_RACA, TO_CHAR(p.DS_PESO), TO_CHAR(p.DS_IDADE),
+                        p.FL_CASTRADO, fn_json_consultas(p.ID_PET)),
+                t_lista('N', 'S', 'S', 'N', 'N', 'B', 'J'));
+        END LOOP;
+        RETURN v_array || ']';
+    END fn_json_pets;
+
+
+    PROCEDURE prc_exportar_dataset(p_json OUT CLOB)
+    IS
+        -- um elemento por linha: a quebra e um espaco valido no JSON e facilita a leitura do arquivo
+        c_separador CONSTANT VARCHAR2(2) := ',' || CHR(10);
+        v_qtd       PLS_INTEGER := 0;
+    BEGIN
+        p_json := '{"origem":"Oracle - PKG_VETI.PRC_EXPORTAR_DATASET","gerado_em":"'
+                  || TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD"T"HH24:MI:SS') || '",' || CHR(10)
+                  || '"tutores":[' || CHR(10);
+
+        FOR t IN (SELECT ID_TUTOR, NM_TUTOR, DS_CPF, DS_EMAIL, DS_TELEFONE FROM TB_TUTOR ORDER BY ID_TUTOR) LOOP
+            IF v_qtd > 0 THEN
+                p_json := p_json || c_separador;
+            END IF;
+            p_json := p_json || fn_monta_json(
+                t_lista('id', 'nome', 'cpf', 'email', 'telefone', 'pets'),
+                t_lista(TO_CHAR(t.ID_TUTOR), t.NM_TUTOR, t.DS_CPF, t.DS_EMAIL, t.DS_TELEFONE, fn_json_pets(t.ID_TUTOR)),
+                t_lista('N', 'S', 'S', 'S', 'S', 'J'));
+            v_qtd := v_qtd + 1;
+        END LOOP;
+
+        -- Excecao 1: sem tutores nao ha dataset (devolve a estrutura vazia e avisa no DBMS_OUTPUT)
+        IF v_qtd = 0 THEN
+            RAISE NO_DATA_FOUND;
+        END IF;
+
+        -- catalogo de veterinarios: a senha (hash) nao sai do banco relacional
+        p_json := p_json || CHR(10) || '],' || CHR(10) || '"veterinarios":[' || CHR(10);
+        v_qtd := 0;
+        FOR v IN (SELECT ID_VETERINARIO, DS_EMAIL, DS_ROLE FROM TB_VETERINARIO ORDER BY ID_VETERINARIO) LOOP
+            IF v_qtd > 0 THEN
+                p_json := p_json || c_separador;
+            END IF;
+            p_json := p_json || fn_monta_json(t_lista('id', 'email', 'perfil'),
+                                              t_lista(TO_CHAR(v.ID_VETERINARIO), v.DS_EMAIL, v.DS_ROLE),
+                                              t_lista('N', 'S', 'S'));
+            v_qtd := v_qtd + 1;
+        END LOOP;
+
+        p_json := p_json || CHR(10) || '],' || CHR(10) || '"medicamentos":[' || CHR(10);
+        v_qtd := 0;
+        FOR m IN (SELECT ID_MEDICAMENTO, NM_MEDICAMENTO, DS_MEDICAMENTO FROM TB_MEDICAMENTO ORDER BY ID_MEDICAMENTO) LOOP
+            IF v_qtd > 0 THEN
+                p_json := p_json || c_separador;
+            END IF;
+            p_json := p_json || fn_monta_json(t_lista('id', 'nome', 'descricao'),
+                                              t_lista(TO_CHAR(m.ID_MEDICAMENTO), m.NM_MEDICAMENTO, m.DS_MEDICAMENTO),
+                                              t_lista('N', 'S', 'S'));
+            v_qtd := v_qtd + 1;
+        END LOOP;
+
+        p_json := p_json || CHR(10) || ']' || CHR(10) || '}';
+        prc_imprime(p_json);
+
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            p_json := '{"tutores":[],"veterinarios":[],"medicamentos":[]}';
+            DBMS_OUTPUT.PUT_LINE('AVISO: nao ha tutores cadastrados para exportar.');
+        -- Excecao 2: valor incompativel ou documento de um tutor acima do tamanho maximo
+        WHEN VALUE_ERROR THEN
+            RAISE_APPLICATION_ERROR(-20041, 'PRC_EXPORTAR_DATASET: valor invalido ou documento acima do tamanho maximo.');
+        -- Excecao 3: qualquer outro erro (inclui os erros da FN_MONTA_JSON)
+        WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20049, 'PRC_EXPORTAR_DATASET: erro inesperado - ' || SQLERRM);
+    END prc_exportar_dataset;
+
+
+    PROCEDURE prc_registrar_auditoria(
+        p_tipo_operacao      IN VARCHAR2,
+        p_valores_anteriores IN VARCHAR2,
+        p_valores_novos      IN VARCHAR2
+    )
+    IS
+        e_tipo_invalido EXCEPTION;
+        e_sem_valores   EXCEPTION;
+    BEGIN
+        -- Excecao 1: somente operacoes DML sao auditadas
+        IF p_tipo_operacao IS NULL OR p_tipo_operacao NOT IN ('INSERT', 'UPDATE', 'DELETE') THEN
+            RAISE e_tipo_invalido;
+        END IF;
+
+        -- Excecao 2: toda operacao precisa ter ao menos os valores anteriores ou os novos
+        IF p_valores_anteriores IS NULL AND p_valores_novos IS NULL THEN
+            RAISE e_sem_valores;
+        END IF;
+
+        -- usa o CLIENT_IDENTIFIER da sessao quando houver; sem ele, o usuario do banco
+        INSERT INTO TB_AUDITORIA (NM_USUARIO, TP_OPERACAO, DT_OPERACAO, DS_VALORES_ANTERIORES, DS_VALORES_NOVOS)
+        VALUES (NVL(SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER'), SYS_CONTEXT('USERENV', 'SESSION_USER')),
+                p_tipo_operacao, SYSTIMESTAMP, p_valores_anteriores, p_valores_novos);
+
+    EXCEPTION
+        WHEN e_tipo_invalido THEN
+            RAISE_APPLICATION_ERROR(-20051, 'PRC_REGISTRAR_AUDITORIA: tipo de operacao invalido (' || p_tipo_operacao || ').');
+        WHEN e_sem_valores THEN
+            RAISE_APPLICATION_ERROR(-20052, 'PRC_REGISTRAR_AUDITORIA: operacao sem valores anteriores nem novos.');
+        -- Excecao 3: valores maiores que as colunas de auditoria
+        WHEN VALUE_ERROR THEN
+            RAISE_APPLICATION_ERROR(-20053, 'PRC_REGISTRAR_AUDITORIA: valores excedem o tamanho da coluna de auditoria.');
+        WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20059, 'PRC_REGISTRAR_AUDITORIA: erro inesperado - ' || SQLERRM);
+    END prc_registrar_auditoria;
+
 END PKG_VETI;
 /
 
 -- BLOCO 3: TRIGGER DE AUDITORIA (DML) EM TB_CONSULTA
+-- A trigger so coleta OLD e NEW (trigger nao pode ficar dentro de package) e delega a gravacao ao PKG_VETI.
+-- Se a auditoria falhar, o erro sobe e a operacao em TB_CONSULTA e desfeita: nenhuma alteracao fica sem registro.
 CREATE OR REPLACE TRIGGER TRG_AUDITORIA_CONSULTA
 AFTER INSERT OR UPDATE OR DELETE ON TB_CONSULTA
 FOR EACH ROW
@@ -354,15 +769,7 @@ BEGIN
                       || ';ID_VETERINARIO=' || :NEW.TB_VETERINARIO_ID_VETERINARIO;
     END IF;
 
-    -- usa o CLIENT_IDENTIFIER da sessao quando houver; sem ele, o usuario do banco
-    INSERT INTO TB_AUDITORIA (NM_USUARIO, TP_OPERACAO, DT_OPERACAO, DS_VALORES_ANTERIORES, DS_VALORES_NOVOS)
-    VALUES (NVL(SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER'), SYS_CONTEXT('USERENV', 'SESSION_USER')),
-            v_tipo_operacao, SYSTIMESTAMP, v_valores_old, v_valores_new);
-
-EXCEPTION
-    WHEN OTHERS THEN
-        -- uma falha de auditoria nao pode derrubar a operacao original em TB_CONSULTA
-        NULL;
+    PKG_VETI.prc_registrar_auditoria(v_tipo_operacao, v_valores_old, v_valores_new);
 END;
 /
 
