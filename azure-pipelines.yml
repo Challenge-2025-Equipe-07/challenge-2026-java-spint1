@@ -34,7 +34,7 @@ stages:
     jobs:
       - job: BuildJob
         pool:
-          vmImage: 'ubuntu-latest'
+          name: Default
         steps:
           - checkout: self
 
@@ -81,7 +81,7 @@ stages:
       - deployment: DeployJob
         environment: 'Production'
         pool:
-          vmImage: 'ubuntu-latest'
+          name: Default
         strategy:
           runOnce:
             deploy:
