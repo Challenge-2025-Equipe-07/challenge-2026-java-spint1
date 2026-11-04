@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Veti API - testes automatizados",
-    "description": "Fluxo core da Veti executado com Newman: health, registro/login JWT, criar tutor, criar pet (FK tutor), criar e excluir consulta, e limpeza. Os dados são gerados por execução (e-mail/CPF únicos), então a collection pode rodar várias vezes no mesmo banco.",
+    "description": "Fluxo core da Veti executado com Newman: health, registro/login JWT (senha validada pela função Oracle), criar tutor, criar pet (FK tutor), criar consulta, relatórios das procedures do PKG_VETI e auditoria da trigger, excluir consulta e limpeza. Os dados são gerados por execução (e-mail/CPF únicos), então a collection pode rodar várias vezes no mesmo banco.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -10,11 +10,13 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080/veti" },
-    { "key": "healthUrl", "value": "http://localhost:8080/health" }
+    { "key": "healthUrl", "value": "http://localhost:8080/health" },
+    { "key": "adminEmail", "value": "admin@veti.com" },
+    { "key": "adminPassword", "value": "TroqueEstaSenha1" }
   ],
   "item": [
     {
-      "name": "01 - Health check (API + PostgreSQL)",
+      "name": "01 - Health check (API + Oracle)",
       "request": {
         "auth": { "type": "noauth" },
         "method": "GET",
@@ -32,7 +34,7 @@
       }]
     },
     {
-      "name": "02 - Registrar veterinário",
+      "name": "02 - Auto-cadastro público de veterinário (role ADMIN pedida é ignorada)",
       "request": {
         "auth": { "type": "noauth" },
         "method": "POST",
@@ -53,7 +55,7 @@
       ]
     },
     {
-      "name": "03 - Login JWT",
+      "name": "03 - Login JWT do veterinário (USER)",
       "request": {
         "auth": { "type": "noauth" },
         "method": "POST",
@@ -65,7 +67,22 @@
         "pm.test('status 200', () => pm.response.to.have.status(200));",
         "const token = pm.response.json().token;",
         "pm.test('retorna token JWT', () => pm.expect(token).to.be.a('string').and.match(/^[\\w-]+\\.[\\w-]+\\.[\\w-]+$/));",
-        "pm.collectionVariables.set('token', token);"
+        "pm.collectionVariables.set('token', token);",
+        "pm.collectionVariables.set('userToken', token);"
+      ] } }]
+    },
+    {
+      "name": "03b - Senha sem número é recusada pela função Oracle PKG_VETI.FN_VALIDA_SENHA",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/register",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"semnumero.{{run}}@veti.test\",\n  \"password\": \"SenhaSemNumero\"\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 409', () => pm.response.to.have.status(409));",
+        "pm.test('mensagem vem da função do banco', () => pm.expect(pm.response.json().mensagem).to.include('numero'));"
       ] } }]
     },
     {
@@ -82,7 +99,44 @@
       ] } }]
     },
     {
-      "name": "05 - Obter id do veterinário logado",
+      "name": "04b - Listar tutores sem token é bloqueado",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": "{{baseUrl}}/tutores"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 403', () => pm.response.to.have.status(403));"
+      ] } }]
+    },
+    {
+      "name": "04c - Veterinário USER não pode cadastrar tutor",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/tutores",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Tutor USER\",\n  \"email\": \"user.{{run}}@veti.test\",\n  \"phone\": \"11900000000\",\n  \"cpf\": \"00000000000\"\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 403 (perfil USER)', () => pm.response.to.have.status(403));"
+      ] } }]
+    },
+    {
+      "name": "04d - Login JWT do administrador (ADMIN)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "pm.collectionVariables.set('token', pm.response.json().token);"
+      ] } }]
+    },
+    {
+      "name": "05 - Obter id do veterinário registrado",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/veterinarios?size=1000"
@@ -167,6 +221,72 @@
           "pm.collectionVariables.set('consultaId', body.id);"
         ] } }
       ]
+    },
+    {
+      "name": "09b - Procedure PKG_VETI.PRC_CONSULTAS_JSON devolve a consulta em JSON",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/relatorios/consultas-json"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "const lista = pm.response.json();",
+        "const item = lista.find(c => c.consulta_id === Number(pm.collectionVariables.get('consultaId')));",
+        "pm.test('JSON montado pela FN_MONTA_JSON contém a consulta criada', () => pm.expect(item).to.exist);",
+        "pm.test('JOIN traz o veterinário', () => pm.expect(item.veterinario_email).to.eql(pm.collectionVariables.get('vetEmail')));"
+      ] } }]
+    },
+    {
+      "name": "09b2 - Procedure PKG_VETI.PRC_EXPORTAR_DATASET aninha a consulta no tutor",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/relatorios/dataset-json"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "const dataset = pm.response.json();",
+        "const tutor = dataset.tutores.find(t => t.id === Number(pm.collectionVariables.get('tutorId')));",
+        "pm.test('tutor criado está no dataset', () => pm.expect(tutor).to.exist);",
+        "const pet = tutor.pets.find(p => p.id === Number(pm.collectionVariables.get('petId')));",
+        "pm.test('pet embutido no tutor', () => pm.expect(pet).to.exist);",
+        "pm.test('consulta embutida no pet', () => pm.expect(pet.consultas.map(c => c.id)).to.include(Number(pm.collectionVariables.get('consultaId'))));",
+        "pm.test('senha dos veterinários não é exportada', () => pm.expect(JSON.stringify(dataset.veterinarios)).to.not.include('password'));"
+      ] } }]
+    },
+    {
+      "name": "09b3 - Procedure PKG_VETI.PRC_RESUMO_RECEITAS devolve o total geral",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/relatorios/resumo-receitas"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "pm.test('relatório com total geral ou aviso de tabela vazia', () => pm.expect(pm.response.text()).to.match(/Total Geral|AVISO/));"
+      ] } }]
+    },
+    {
+      "name": "09c - Trigger TRG_AUDITORIA_CONSULTA registrou o INSERT",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/relatorios/auditoria-consultas"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 200', () => pm.response.to.have.status(200));",
+        "const id = pm.collectionVariables.get('consultaId');",
+        "const registro = pm.response.json().find(a => a.operacao === 'INSERT' && (a.valoresNovos || '').startsWith(`ID_CONSULTA=${id};`));",
+        "pm.test('TB_AUDITORIA tem o INSERT da consulta', () => pm.expect(registro).to.exist);"
+      ] } }]
+    },
+    {
+      "name": "09d - Relatórios do banco são só do ADMIN",
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/relatorios/resumo-consultas"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('status 403 (perfil USER)', () => pm.response.to.have.status(403));"
+      ] } }]
     },
     {
       "name": "10 - Excluir consulta",

@@ -1,30 +1,85 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <title>Veti - Tutores</title>
-</head>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:replace="~{fragments/layout :: head('Tutores')}"></head>
 <body>
-<h1>Tutores cadastrados</h1>
-<table border="1" cellpadding="8">
-  <thead>
-  <tr>
-    <th>ID</th>
-    <th>Nome</th>
-    <th>CPF</th>
-    <th>E-mail</th>
-    <th>Telefone</th>
-  </tr>
-  </thead>
-  <tbody>
-  <tr th:each="tutor : ${tutores}">
-    <td th:text="${tutor.id}"></td>
-    <td th:text="${tutor.name}"></td>
-    <td th:text="${tutor.cpf}"></td>
-    <td th:text="${tutor.email}"></td>
-    <td th:text="${tutor.phone}"></td>
-  </tr>
-  </tbody>
-</table>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="container">
+    <div class="page-header">
+        <div>
+            <h1>Tutores</h1>
+            <p>Responsáveis pelos pets atendidos na clínica.</p>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: mensagens}"></div>
+
+    <div class="grid" th:classappend="${usuario == null or !usuario.admin} ? 'full'">
+        <section class="card" th:if="${usuario != null and usuario.admin}">
+            <h2>Novo tutor</h2>
+            <form th:action="@{/tutores/painel}" method="post" novalidate>
+                <div class="field" th:classappend="${erros['name'] != null} ? 'invalido'">
+                    <label for="name">Nome completo</label>
+                    <input id="name" name="name" th:value="${form?.name}" maxlength="300" required>
+                    <div class="erro" th:if="${erros['name'] != null}" th:text="${erros['name']}"></div>
+                </div>
+                <div class="field" th:classappend="${erros['email'] != null} ? 'invalido'">
+                    <label for="email">E-mail</label>
+                    <input id="email" type="email" name="email" th:value="${form?.email}" required>
+                    <div class="erro" th:if="${erros['email'] != null}" th:text="${erros['email']}"></div>
+                </div>
+                <div class="row">
+                    <div class="field" th:classappend="${erros['cpf'] != null} ? 'invalido'">
+                        <label for="cpf">CPF</label>
+                        <input id="cpf" name="cpf" th:value="${form?.cpf}" inputmode="numeric" maxlength="11"
+                               placeholder="Só números" required>
+                        <div class="erro" th:if="${erros['cpf'] != null}" th:text="${erros['cpf']}"></div>
+                    </div>
+                    <div class="field" th:classappend="${erros['phone'] != null} ? 'invalido'">
+                        <label for="phone">Telefone</label>
+                        <input id="phone" name="phone" th:value="${form?.phone}" inputmode="numeric" maxlength="13"
+                               placeholder="11912345678" required>
+                        <div class="erro" th:if="${erros['phone'] != null}" th:text="${erros['phone']}"></div>
+                    </div>
+                </div>
+                <div class="form-acoes"><button type="submit" class="btn add">Cadastrar tutor</button></div>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Tutores cadastrados (<span th:text="${#lists.size(tutores)}">0</span>)</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>CPF</th>
+                        <th>E-mail</th>
+                        <th>Telefone</th>
+                        <th th:if="${usuario != null and usuario.admin}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="tutor : ${tutores}">
+                        <td th:text="${tutor.name}"></td>
+                        <td th:text="${tutor.cpf}"></td>
+                        <td th:text="${tutor.email}"></td>
+                        <td th:text="${tutor.phone}"></td>
+                        <td th:if="${usuario != null and usuario.admin}">
+                            <form th:action="@{/tutores/painel/{id}/excluir(id=${tutor.id})}" method="post"
+                                  onsubmit="return confirm('Excluir este tutor?')">
+                                <button type="submit" class="btn danger small">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(tutores)}">
+                        <td colspan="5" class="vazio">Nenhum tutor cadastrado ainda.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</main>
 </body>
 </html>

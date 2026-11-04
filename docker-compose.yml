@@ -1,27 +1,41 @@
 services:
   db:
-    image: postgres:latest
+    # Oracle Database 23ai Free; cria o usuario da aplicacao (APP_USER) no PDB FREEPDB1
+    image: gvenzl/oracle-free:23-slim
     restart: always
     environment:
-      POSTGRES_USER: ccgl
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: veti-db
-
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD}
+      APP_USER: ${DB_USER}
+      APP_USER_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "1521:1521"
     volumes:
-      - veti-data:/var/lib/postgresql
+      - veti-oradata:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   app:
     build: .
     ports:
       - "8080:8080"
     environment:
-      - DB_USER=ccgl
-      - DB_PASSWORD=secret
-      - DB_URL=jdbc:postgresql://db:5432/veti-db
-      - GOOGLE_CLIENT_ID=484681037880-492aijp28gb4rndl2gi040cqj3gt0efi.apps.googleusercontent.com
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_URL=jdbc:oracle:thin:@//db:1521/FREEPDB1
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
-  veti-data:
+  veti-oradata:

@@ -1,12 +1,13 @@
 package br.com.fiap.veti.handler;
 
+import br.com.fiap.veti.config.AuthCookies;
 import br.com.fiap.veti.entity.VeterinarioEntity;
 import br.com.fiap.veti.repository.VeterinarioRepository;
 import br.com.fiap.veti.service.TokenService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -30,11 +31,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         VeterinarioEntity veterinario = veterinarioRepository.findByEmail(email);
         String token = tokenService.generateToken(veterinario);
 
-        Cookie cookie = new Cookie("veti_token", token);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        response.addCookie(cookie);
-
-        response.sendRedirect("/veti/consultas");
+        response.addHeader(HttpHeaders.SET_COOKIE, AuthCookies.create(token, request.isSecure()));
+        response.sendRedirect(request.getContextPath() + "/");
     }
 }

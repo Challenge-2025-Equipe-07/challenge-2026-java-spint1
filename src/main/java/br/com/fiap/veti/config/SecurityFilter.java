@@ -20,8 +20,6 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class SecurityFilter extends OncePerRequestFilter {
 
-    private static final String COOKIE_NAME = "veti_token";
-
     private final TokenService tokenService;
     private final VeterinarioRepository veterinarioRepository;
 
@@ -73,7 +71,7 @@ public class SecurityFilter extends OncePerRequestFilter {
             return null;
         }
         for (Cookie cookie : cookies) {
-            if (COOKIE_NAME.equals(cookie.getName())) {
+            if (AuthCookies.NAME.equals(cookie.getName())) {
                 return cookie.getValue();
             }
         }

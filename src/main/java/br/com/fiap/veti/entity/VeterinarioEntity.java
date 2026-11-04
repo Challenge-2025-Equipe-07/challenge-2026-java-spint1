@@ -34,16 +34,16 @@ public class VeterinarioEntity implements UserDetails {
     @NotBlank(message = "E-mail é obrigatório")
     @Email(message = "E-mail inválido")
     @Size(max = 320, message = "E-mail deve ter no máximo 320 caracteres")
-    @Column(name = "DS_EMAIL", nullable = false, length = 320, unique = true)
+    @Column(name = "DS_EMAIL", nullable = false, length = 320)
     private String email;
 
     @NotBlank(message = "Senha é obrigatória")
-    @Size(max = 5000, message = "Senha deve ter no máximo 5000 caracteres")
-    @Column(name = "DS_PASSWORD", nullable = false, length = 5000)
+    @Size(max = 100, message = "Senha deve ter no máximo 100 caracteres")
+    @Column(name = "DS_PASSWORD", nullable = false, length = 100)
     private String password;
 
     @NotBlank(message = "Role e obrigatoria")
-    @Column(name = "DS_ROLE")
+    @Column(name = "DS_ROLE", nullable = false, length = 20)
     private String role;
 
     @Override

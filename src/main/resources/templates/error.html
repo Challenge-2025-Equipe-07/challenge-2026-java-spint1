@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:replace="~{fragments/layout :: head('Ops')}"></head>
+<body>
+<main class="login-page">
+    <div class="login-card" style="text-align: center">
+        <div class="brand"><span class="brand-mark">🐾</span> Veti</div>
+        <h1 th:text="${status}">Erro</h1>
+        <p th:switch="${status}">
+            <span th:case="403">Você não tem permissão para acessar esta página.</span>
+            <span th:case="404">Página não encontrada.</span>
+            <span th:case="*">Algo deu errado. Tente novamente em instantes.</span>
+        </p>
+        <a class="btn block" th:href="@{/}">Voltar ao início</a>
+    </div>
+</main>
+</body>
+</html>

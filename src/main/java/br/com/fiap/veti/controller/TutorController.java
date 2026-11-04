@@ -8,12 +8,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
@@ -24,15 +22,6 @@ public class TutorController {
 
     private final TutorService tutorService;
 
-
-    @GetMapping("/painel")
-    @Operation(summary = "Painel HTML com lista de tutores")
-    public ModelAndView painel() {
-        var tutores = tutorService.listarTodos(PageRequest.of(0, 100, org.springframework.data.domain.Sort.by("nome")));
-        var mv = new ModelAndView("tutores-painel");
-        mv.addObject("tutores", tutores.getContent());
-        return mv;
-    }
 
     @GetMapping
     @Operation(summary = "Listar todos os tutores paginados")

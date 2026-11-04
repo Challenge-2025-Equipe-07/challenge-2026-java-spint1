@@ -31,7 +31,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             veterinario = new VeterinarioEntity();
             veterinario.setEmail(email);
             veterinario.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-            veterinario.setRole(Role.ADMIN.name());
+            // Conta criada pelo Google entra como USER; promoção a ADMIN é feita por um ADMIN
+            veterinario.setRole(Role.USER.name());
             veterinarioRepository.save(veterinario);
         }
 

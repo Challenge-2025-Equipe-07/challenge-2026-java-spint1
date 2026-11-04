@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:replace="~{fragments/layout :: head('Relatórios')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="container">
+    <div class="page-header">
+        <div>
+            <h1>Relatórios do banco</h1>
+            <p>Gerados no Oracle pelo package <code>PKG_VETI</code> e pela trigger <code>TRG_AUDITORIA_CONSULTA</code>.</p>
+        </div>
+        <div>
+            <a class="btn ghost" th:href="@{/relatorios/dataset-json(download=true)}">Exportar dataset JSON</a>
+            <a class="btn ghost" th:href="@{/relatorios/painel}">Atualizar</a>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: mensagens}"></div>
+
+    <section class="card">
+        <h2>Consultas por veterinário e pet</h2>
+        <p class="dica">Procedure <code>PKG_VETI.PRC_RESUMO_CONSULTAS</code>: contagem manual com subtotal por veterinário e total geral.</p>
+        <pre class="relatorio" th:text="${resumo}"></pre>
+    </section>
+
+    <section class="card" style="margin-top: 20px">
+        <h2>Medicamentos por receita</h2>
+        <p class="dica">Procedure <code>PKG_VETI.PRC_RESUMO_RECEITAS</code>: soma manual das quantidades por receita e medicamento,
+            com subtotal por receita e total geral (sem ROLLUP, CUBE ou GROUPING SETS).</p>
+        <pre class="relatorio" th:text="${resumoReceitas}"></pre>
+    </section>
+
+    <section class="card" style="margin-top: 20px">
+        <h2>Consultas em JSON</h2>
+        <p class="dica">Procedure <code>PKG_VETI.PRC_CONSULTAS_JSON</code>: JOIN de consulta, pet, tutor e veterinário,
+            convertido em JSON pela função <code>FN_MONTA_JSON</code> (sem funções nativas de JSON).</p>
+        <pre class="relatorio" th:text="${consultasJson}"></pre>
+    </section>
+
+    <section class="card" style="margin-top: 20px">
+        <h2>Auditoria de consultas</h2>
+        <p class="dica">Registros gravados em <code>TB_AUDITORIA</code> pela trigger a cada inclusão, alteração ou exclusão de consulta.</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Data e hora</th>
+                    <th>Operação</th>
+                    <th>Usuário do banco</th>
+                    <th>Antes</th>
+                    <th>Depois</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="a : ${auditoria}">
+                    <td th:text="${#temporals.format(a.dataHora, 'dd/MM/yyyy HH:mm:ss')}"></td>
+                    <td><span class="badge" th:classappend="${a.operacao == 'INSERT'} ? 'ok' : (${a.operacao == 'DELETE'} ? 'admin' : 'user')"
+                              th:text="${a.operacao}"></span></td>
+                    <td th:text="${a.usuario}"></td>
+                    <td class="mono" th:text="${a.valoresAnteriores}"></td>
+                    <td class="mono" th:text="${a.valoresNovos}"></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(auditoria)}">
+                    <td colspan="5" class="vazio">Nenhuma alteração registrada ainda.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>

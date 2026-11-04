@@ -1,5 +1,6 @@
 package br.com.fiap.veti.controller.advice;
 
+import br.com.fiap.veti.exception.EmailNaoEnviadoException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,13 @@ public class ControllerAdvice {
         log.warn("Regra de negocio violada: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErroResponse(HttpStatus.CONFLICT.value(), ex.getMessage(), LocalDateTime.now()));
+    }
+
+    @ExceptionHandler(EmailNaoEnviadoException.class)
+    public ResponseEntity<ErroResponse> handleEmailNaoEnviado(EmailNaoEnviadoException ex) {
+        log.error("Falha no envio de e-mail: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(new ErroResponse(HttpStatus.BAD_GATEWAY.value(), ex.getMessage(), LocalDateTime.now()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -1,34 +1,109 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title>Veti - Pets</title>
-</head>
+<html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
+<head th:replace="~{fragments/layout :: head('Pets')}"></head>
 <body>
-<h1>Pets cadastrados</h1>
-<table border="1" cellpadding="8">
-    <thead>
-    <tr>
-        <th>ID</th>
-        <th>Nome</th>
-        <th>Raça</th>
-        <th>Peso</th>
-        <th>Idade</th>
-        <th>Castrado</th>
-        <th>ID do Tutor</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr th:each="pet : ${pets}">
-        <td th:text="${pet.id}"></td>
-        <td th:text="${pet.nome}"></td>
-        <td th:text="${pet.raca}"></td>
-        <td th:text="${pet.peso}"></td>
-        <td th:text="${pet.idade}"></td>
-        <td th:text="${pet.castrado} ? 'Sim' : 'Não'"></td>
-        <td th:text="${pet.idTutor}"></td>
-    </tr>
-    </tbody>
-</table>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="container">
+    <div class="page-header">
+        <div>
+            <h1>Pets</h1>
+            <p>Animais acompanhados pela clínica.</p>
+        </div>
+    </div>
+
+    <div th:replace="~{fragments/layout :: mensagens}"></div>
+
+    <div class="grid" th:classappend="${usuario == null or !usuario.admin} ? 'full'">
+        <section class="card" th:if="${usuario != null and usuario.admin}">
+            <h2>Novo pet</h2>
+            <div class="somente-leitura" th:if="${#lists.isEmpty(tutores)}">
+                Cadastre um <a th:href="@{/tutores/painel}">tutor</a> antes de cadastrar o pet.
+            </div>
+            <form th:unless="${#lists.isEmpty(tutores)}" th:action="@{/pets/painel}" method="post" novalidate>
+                <div class="field" th:classappend="${erros['name'] != null} ? 'invalido'">
+                    <label for="name">Nome</label>
+                    <input id="name" name="name" th:value="${form?.name}" maxlength="100" required>
+                    <div class="erro" th:if="${erros['name'] != null}" th:text="${erros['name']}"></div>
+                </div>
+                <div class="field" th:classappend="${erros['idTutor'] != null} ? 'invalido'">
+                    <label for="idTutor">Tutor</label>
+                    <select id="idTutor" name="idTutor" required>
+                        <option value="">Selecione...</option>
+                        <option th:each="t : ${tutores}" th:value="${t.id}" th:text="${t.name + ' (' + t.cpf + ')'}"
+                                th:selected="${form != null and form.idTutor == t.id}"></option>
+                    </select>
+                    <div class="erro" th:if="${erros['idTutor'] != null}" th:text="${erros['idTutor']}"></div>
+                </div>
+                <div class="field" th:classappend="${erros['raca'] != null} ? 'invalido'">
+                    <label for="raca">Raça</label>
+                    <select id="raca" name="raca" required>
+                        <option value="">Selecione...</option>
+                        <option th:each="r : ${racas}" th:value="${r}"
+                                th:text="${#strings.capitalizeWords(#strings.toLowerCase(#strings.replace(r.name(), '_', ' ')))}"
+                                th:selected="${form != null and form.raca == r}"></option>
+                    </select>
+                    <div class="erro" th:if="${erros['raca'] != null}" th:text="${erros['raca']}"></div>
+                </div>
+                <div class="row">
+                    <div class="field" th:classappend="${erros['peso'] != null} ? 'invalido'">
+                        <label for="peso">Peso (kg)</label>
+                        <input id="peso" type="number" step="0.1" min="0.1" name="peso" th:value="${form?.peso}" required>
+                        <div class="erro" th:if="${erros['peso'] != null}" th:text="${erros['peso']}"></div>
+                    </div>
+                    <div class="field" th:classappend="${erros['idade'] != null} ? 'invalido'">
+                        <label for="idade">Idade (anos)</label>
+                        <input id="idade" type="number" min="0" max="99" name="idade" th:value="${form?.idade}" required>
+                        <div class="erro" th:if="${erros['idade'] != null}" th:text="${erros['idade']}"></div>
+                    </div>
+                </div>
+                <div class="field check">
+                    <input id="castrado" type="checkbox" name="castrado" value="true"
+                           th:checked="${form != null and form.castrado}">
+                    <label for="castrado">O pet é castrado?</label>
+                </div>
+                <div class="form-acoes"><button type="submit" class="btn add">Cadastrar pet</button></div>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Pets cadastrados (<span th:text="${#lists.size(pets)}">0</span>)</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Raça</th>
+                        <th>Peso</th>
+                        <th>Idade</th>
+                        <th>Castrado</th>
+                        <th>Tutor</th>
+                        <th th:if="${usuario != null and usuario.admin}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="pet : ${pets}">
+                        <td th:text="${pet.nome}"></td>
+                        <td th:text="${#strings.capitalizeWords(#strings.toLowerCase(#strings.replace(pet.raca.name(), '_', ' ')))}"></td>
+                        <td th:text="${#numbers.formatDecimal(pet.peso, 1, 1, 'COMMA')} + ' kg'"></td>
+                        <td th:text="${pet.idade} + (${pet.idade} == 1 ? ' ano' : ' anos')"></td>
+                        <td><span class="badge" th:classappend="${pet.castrado} ? 'ok'" th:text="${pet.castrado} ? 'Sim' : 'Não'"></span></td>
+                        <td th:text="${nomeTutor[pet.idTutor]}"></td>
+                        <td th:if="${usuario != null and usuario.admin}">
+                            <form th:action="@{/pets/painel/{id}/excluir(id=${pet.id})}" method="post"
+                                  onsubmit="return confirm('Excluir este pet?')">
+                                <button type="submit" class="btn danger small">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(pets)}">
+                        <td colspan="7" class="vazio">Nenhum pet cadastrado ainda.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</main>
 </body>
 </html>
