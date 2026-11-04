@@ -9,7 +9,7 @@
 | RM | Nome | Turma |
 |---|---|---|
 | 564113 | Camilo Micheletto da Silva | 2TDSPW |
-| 564982 | Carlos André Silva | 2TDSPW |
+| 564968 | Carlos André Silva | 2TDSPW |
 | 562700 | Guilherme Ribeiro da Costa | 2TDSPW |
 | 566376 | Laura Lopes Cruz | 2TDSPW |
 
@@ -45,12 +45,21 @@ Em runtime o usuário chama a API por HTTPS, a Web App grava no PostgreSQL por J
 
 O DDL oficial, com tabelas, PKs, FKs e comentários, está em [`script_bd.sql`](script_bd.sql). O fluxo de homologação usa `TB_TUTOR` (pai) e `TB_PET` (filho). No App Service o padrão é `DDL_AUTO=update`, que aplica o mesmo modelo via Hibernate. Use `DDL_AUTO=validate` quando o schema já tiver sido criado por esse script.
 
-## Como executar o projeto
+## Como auditar a entrega
 
-1. Criar credenciais para google OAuth2 conforme slides apresentados em aula (URL de redirect autorizada http://localhost:8080/veti/login/oauth2/code/google) 
-2. Realizar docker compose up -v
-3. acessar http://localhost:8080/veti/ e você já será redirecionado para a tela de login
-4. Para criar dados de teste você pode usar a collection anexa no projeto.
+A API avaliada está no App Service. A raiz `/` não tem página. O health check público é `GET /health`.
+
+```bash
+curl -sS https://app-ccgl-rm564113.azurewebsites.net/health
+./mvnw test
+npx newman run api-tests/veti.postman_collection.json \
+  --env-var baseUrl=https://app-ccgl-rm564113.azurewebsites.net/veti \
+  --env-var healthUrl=https://app-ccgl-rm564113.azurewebsites.net/health
+```
+
+Swagger: https://app-ccgl-rm564113.azurewebsites.net/veti/swagger-ui.html
+
+O `Dockerfile` e o `docker-compose.yml` sobem só um PostgreSQL local para desenvolvimento. O deploy da disciplina é o JAR no App Service, na seção abaixo. Login Google local pede client id e secret e a redirect `http://localhost:8080/veti/login/oauth2/code/google`. Sem essas variáveis a API sobe só com JWT.
 
 ## Variáveis de ambiente
 
@@ -91,10 +100,34 @@ Testes unitários (padrão AAA, Mockito, não precisam de banco):
 Testes de API (Postman/Newman) em [api-tests/veti.postman_collection.json](api-tests/veti.postman_collection.json), com a API rodando:
 
 ```bash
-npx newman run api-tests/veti.postman_collection.json --env-var baseUrl=http://localhost:8080/veti --env-var healthUrl=http://localhost:8080/health
+npx newman run api-tests/veti.postman_collection.json \
+  --env-var baseUrl=https://app-ccgl-rm564113.azurewebsites.net/veti \
+  --env-var healthUrl=https://app-ccgl-rm564113.azurewebsites.net/health
 ```
 
+Para uma API local, troque as URLs por `http://localhost:8080/veti` e `http://localhost:8080/health`.
+
 Casos cobertos: health check com banco, registro + login JWT, bloqueio sem token, criar tutor, criar pet com FK do tutor, pet com tutor inexistente (404), criar consulta, excluir consulta (e confirmar 404) e limpeza. O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) roda tudo isso no GitHub Actions com PostgreSQL.
+
+## Scripts Azure CLI
+
+Os scripts da Opção 2 estão na raiz deste repositório, junto com o código:
+
+| Arquivo | Função |
+|---|---|
+| `azure_create_infra.sh` | Cria App Service, PostgreSQL, Key Vault, Application Insights, gera o JAR e faz o deploy |
+| `azure_test_infra.sh` | Confere Web App, PostgreSQL, Application Insights e `GET /health` |
+| `azure_test_crud.sh` | CRUD HTTP e SELECT de conferência |
+| `azure_delete_infra.sh` | Apaga o Resource Group e faz purge do Key Vault |
+| `tests/run_newman.sh` | Newman contra a API publicada |
+
+```bash
+chmod +x azure_*.sh tests/run_newman.sh
+./azure_test_infra.sh
+./tests/run_newman.sh
+```
+
+Recriar a infra exige `az login` e `export PG_ADMIN_PASSWORD='...'` antes de `./azure_create_infra.sh`. O script usa este repositório como fonte quando o `mvnw` está na mesma pasta.
 
 ## Deploy no Azure App Service (JAR, sem container)
 
