@@ -107,7 +107,7 @@ stages:
                     scriptLocation: inlineScript
                     inlineScript: |
                       set -euo pipefail
-                      settings=(DDL_AUTO=update)
+                      settings=(DDL_AUTO=update DB_INIT_MODE=never)
                       add() {
                         local name="$1"
                         local value="$2"

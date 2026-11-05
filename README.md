@@ -230,7 +230,7 @@ Para regenerar o DDL depois de mudar uma entidade, suba a aplicação uma vez co
 |---|---|---|
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | sim | Conexão Oracle, ex.: `jdbc:oracle:thin:@//<host>:1521/FREEPDB1` |
 | `ORACLE_PASSWORD` | só no docker-compose | Senha do SYS/SYSTEM do container Oracle local |
-| `DB_INIT_MODE` | não | Padrão `always`: aplica o `pkg_veti.sql` na subida. Use `never` se o package for mantido à mão |
+| `DB_INIT_MODE` | não | Padrão `never`, para o App Service PostgreSQL não executar o PL/SQL. No Oracle, use `always` para aplicar o `pkg_veti.sql` na subida |
 | `JWT_SECRET` | sim | Segredo de assinatura do JWT (sem valor padrão no código) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | sim (1ª subida) | Administrador inicial, criado se ainda não existir |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | não | Ativam o login com Google. Sem elas a aplicação sobe só com login por e-mail/senha |
