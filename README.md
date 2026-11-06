@@ -310,3 +310,5 @@ O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) roda a cada push
 O deploy em produção é feito na EC2 (seção [Deploy na AWS](#deploy-na-aws-ec2-com-https)): `git pull` seguido de `docker compose ... up -d --build`. Os segredos de produção ficam só no `.env` da EC2, fora do repositório.
 
 Apresentação ao vivo do time CCGL.
+
+Apresentação ao vivo do time CCGL.
