@@ -308,3 +308,5 @@ O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) roda a cada push
 4. Roda os testes de API (Newman) e mostra os logs da API se algo falhar.
 
 O deploy em produção é feito na EC2 (seção [Deploy na AWS](#deploy-na-aws-ec2-com-https)): `git pull` seguido de `docker compose ... up -d --build`. Os segredos de produção ficam só no `.env` da EC2, fora do repositório.
+
+Apresentação ao vivo do time CCGL.
